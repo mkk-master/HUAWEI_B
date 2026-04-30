@@ -1,23 +1,48 @@
-// 文件路径: entry/src/main/ets/pages/Index.ets
+//文件路径: entry/src/main/ets/pages/Index.ets
 import { BillViewModel } from '../viewmodel/BillViewModel';
 import { CurrencyUtil } from '../utils/CurrencyUtil';
 import { CategoryType } from '../model/BillModel';
 import { BillModel } from '../model/BillModel';
+import { DatabaseHelper } from '../database/DatabaseHelper';
+import router from '@ohos.router';
+
 interface SelectOption {
   value: ResourceStr;
   icon?: ResourceStr;
 }
+
 @Entry
 @Component
 struct Index {
   @State viewModel: BillViewModel = new BillViewModel();
   @State searchKeyword: string = '';
   @State filterCategory: string = '';
+  @State refreshFlag: number = 0;
+
   private categoryOptions: SelectOption[] = this.createCategoryOptions();
+  private dbHelper: DatabaseHelper = DatabaseHelper.getInstance();
 
   async aboutToAppear(): Promise<void> {
+    await this.dbHelper.initDatabase(getContext(this));
     await this.viewModel.init();
+    this.categoryOptions = this.createCategoryOptions();
+    await this.refreshData();
   }
+
+  onPageShow(): void {
+    this.refreshData();
+  }
+
+  async refreshData(): Promise<void> {
+    try {
+      await this.viewModel.loadBills(this.searchKeyword, this.filterCategory);
+      await this.viewModel.loadBudget();
+      this.refreshFlag++;
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    }
+  }
+
   private createCategoryOptions(): SelectOption[] {
     const options: SelectOption[] = [
       { value: '全部类型' as ResourceStr }
@@ -30,25 +55,49 @@ struct Index {
 
     return options;
   }
+
   build() {
     Column() {
-      // 顶部预算卡片
+      this.buildHeader();
+
+      // 新增：月份选择栏
+      this.buildMonthSelector();
+
       this.buildBudgetCard();
-
-      // 搜索筛选栏
       this.buildSearchBar();
+      this.buildActionButtons();
 
-      // 账单列表
-      List() {
-        ForEach(this.viewModel.bills, (bill: BillModel) => {
-          ListItem() {
-            this.buildBillItem(bill)
-          }
-          .swipeAction({ end: this.buildSwipeActions(bill) })
-        }, (bill: BillModel) => bill.id.toString())
+      if (this.viewModel.bills.length === 0) {
+        Column() {
+          Text('当前月份暂无账单')
+            .fontSize(16)
+            .fontColor('#999999')
+            .margin({ top: 40 })
+
+          Text('可以切换月份查看其他账单')
+            .fontSize(12)
+            .fontColor('#BBBBBB')
+            .margin({ top: 8 })
+        }
+        .layoutWeight(1)
+        .width('100%')
+        .backgroundColor('#F5F5F5')
+      } else {
+        List() {
+          ForEach(this.viewModel.bills, (bill: BillModel) => {
+            ListItem() {
+              this.buildBillItem(bill)
+            }
+            .swipeAction({
+              end: this.buildSwipeActions(bill)
+            })
+          }, (bill: BillModel) => {
+            return bill.id.toString();
+          })
+        }
+        .layoutWeight(1)
+        .backgroundColor('#F5F5F5')
       }
-      .layoutWeight(1)
-      .backgroundColor('#F5F5F5')
     }
     .width('100%')
     .height('100%')
@@ -56,12 +105,117 @@ struct Index {
   }
 
   @Builder
+  buildHeader() {
+    Row() {
+      Text('智慧记账')
+        .fontSize(24)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#333333')
+
+      Blank()
+
+      Button() {
+        Text('📊')
+          .fontSize(20)
+      }
+      .width(40)
+      .height(40)
+      .backgroundColor('#F0F0F0')
+      .borderRadius(20)
+      .margin({ right: 8 })
+      .onClick(async () => {
+        await router.pushUrl({
+          url: 'pages/StatisticsPage'
+        });
+
+        await this.refreshData();
+      })
+
+      Button() {
+        Text('💰')
+          .fontSize(20)
+      }
+      .width(40)
+      .height(40)
+      .backgroundColor('#F0F0F0')
+      .borderRadius(20)
+      .onClick(async () => {
+        await router.pushUrl({
+          url: 'pages/BudgetPage'
+        });
+
+        await this.refreshData();
+      })
+    }
+    .width('90%')
+    .padding({
+      top: 16,
+      bottom: 8
+    })
+  }
+
+  @Builder
+  buildMonthSelector() {
+    Row() {
+      Button('上月')
+        .fontSize(13)
+        .height(36)
+        .backgroundColor('#F5F5F5')
+        .fontColor('#333333')
+        .borderRadius(18)
+        .onClick(async () => {
+          await this.viewModel.goPreviousMonth(this.searchKeyword, this.filterCategory);
+          this.refreshFlag++;
+        })
+
+      Blank()
+
+      Text(this.viewModel.currentMonth)
+        .fontSize(18)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#333333')
+
+      Blank()
+
+      Button('下月')
+        .fontSize(13)
+        .height(36)
+        .backgroundColor('#F5F5F5')
+        .fontColor('#333333')
+        .borderRadius(18)
+        .onClick(async () => {
+          await this.viewModel.goNextMonth(this.searchKeyword, this.filterCategory);
+          this.refreshFlag++;
+        })
+
+      Button('本月')
+        .fontSize(13)
+        .height(36)
+        .backgroundColor('#4CAF50')
+        .fontColor('#FFFFFF')
+        .borderRadius(18)
+        .margin({ left: 8 })
+        .onClick(async () => {
+          await this.viewModel.goCurrentMonth(this.searchKeyword, this.filterCategory);
+          this.refreshFlag++;
+        })
+    }
+    .width('90%')
+    .height(44)
+    .margin({
+      top: 4,
+      bottom: 8
+    })
+  }
+
+  @Builder
   buildBudgetCard() {
     Column() {
       Row() {
-        Text('本月剩余')
+        Text(`${this.viewModel.currentMonth} 剩余`)
           .fontSize(14)
           .fontColor('#666666')
+
         Text(`${CurrencyUtil.fenToYuan(this.viewModel.getRemainingBudget())} 元`)
           .fontSize(24)
           .fontWeight(FontWeight.Bold)
@@ -78,7 +232,10 @@ struct Index {
       })
         .width('100%')
         .height(8)
-        .style({ strokeWidth: 8, strokeRadius: 4 })
+        .style({
+          strokeWidth: 8,
+          strokeRadius: 4
+        })
         .color(this.viewModel.getRemainingBudget() >= 0 ? '#4CAF50' : '#F44336')
         .margin({ top: 8 })
 
@@ -86,6 +243,7 @@ struct Index {
         Text(`预算 ${CurrencyUtil.fenToYuan(this.viewModel.monthlyBudget)}`)
           .fontSize(12)
           .fontColor('#999999')
+
         Text(`已花 ${CurrencyUtil.fenToYuan(this.viewModel.monthlyTotal)}`)
           .fontSize(12)
           .fontColor('#999999')
@@ -98,21 +256,34 @@ struct Index {
     .padding(16)
     .backgroundColor('#FFFFFF')
     .borderRadius(12)
-    .shadow({ radius: 8, color: '#10000000', offsetX: 0, offsetY: 2 })
-    .margin({ top: 16, bottom: 12 })
+    .shadow({
+      radius: 8,
+      color: '#10000000',
+      offsetX: 0,
+      offsetY: 2
+    })
+    .margin({
+      top: 8,
+      bottom: 12
+    })
   }
 
   @Builder
   buildSearchBar() {
     Row() {
-      // 搜索框
-      TextInput({ placeholder: '搜索备注关键字', text: this.searchKeyword })
+      TextInput({
+        placeholder: '搜索备注关键字',
+        text: this.searchKeyword
+      })
         .layoutWeight(1)
         .height(36)
         .fontSize(14)
         .backgroundColor('#F5F5F5')
         .borderRadius(18)
-        .padding({ left: 12, right: 12 })
+        .padding({
+          left: 12,
+          right: 12
+        })
         .onChange((value: string) => {
           this.searchKeyword = value;
         })
@@ -120,11 +291,12 @@ struct Index {
           this.viewModel.loadBills(this.searchKeyword, this.filterCategory);
         })
 
-      // 分类筛选
       Select(this.categoryOptions)
         .selected(this.getSelectedIndex())
         .value(this.filterCategory || '全部类型')
-        .font({ size: 14 })
+        .font({
+          size: 14
+        })
         .selectedOptionBgColor('#E3F2FD')
         .optionBgColor('#FFFFFF')
         .width(100)
@@ -132,16 +304,75 @@ struct Index {
         .margin({ left: 8 })
         .onSelect((index: number, value?: string) => {
           if (index === 0) {
-            this.filterCategory = ''; // 选择"全部类型"
+            this.filterCategory = '';
           } else {
             this.filterCategory = value || '';
           }
+
           this.viewModel.loadBills(this.searchKeyword, this.filterCategory);
         })
     }
     .width('90%')
     .margin({ bottom: 8 })
   }
+
+  @Builder
+  buildActionButtons() {
+    Row() {
+      Button() {
+        Row() {
+          Text('+')
+            .fontSize(20)
+            .fontWeight(FontWeight.Bold)
+            .margin({ right: 4 })
+
+          Text('记一笔')
+            .fontSize(16)
+        }
+      }
+      .width('45%')
+      .height(48)
+      .backgroundColor('#4CAF50')
+      .borderRadius(24)
+      .onClick(async () => {
+        await router.pushUrl({
+          url: 'pages/AddBillPage'
+        });
+
+        await this.refreshData();
+      })
+
+      Blank()
+
+      Button() {
+        Row() {
+          Text('📈')
+            .fontSize(16)
+            .margin({ right: 4 })
+
+          Text('消费统计')
+            .fontSize(16)
+        }
+      }
+      .width('45%')
+      .height(48)
+      .backgroundColor('#2196F3')
+      .borderRadius(24)
+      .onClick(async () => {
+        await router.pushUrl({
+          url: 'pages/StatisticsPage'
+        });
+
+        await this.refreshData();
+      })
+    }
+    .width('90%')
+    .margin({
+      top: 4,
+      bottom: 8
+    })
+  }
+
   private getSelectedIndex(): number {
     if (!this.filterCategory) {
       return 0;
@@ -155,6 +386,7 @@ struct Index {
 
     return 0;
   }
+
   @Builder
   buildBillItem(bill: BillModel) {
     Row() {
@@ -162,11 +394,14 @@ struct Index {
         Text(bill.category)
           .fontSize(16)
           .fontWeight(FontWeight.Medium)
+
         Text(bill.remark || '无备注')
           .fontSize(12)
           .fontColor('#999999')
           .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .textOverflow({
+            overflow: TextOverflow.Ellipsis
+          })
       }
       .alignItems(HorizontalAlign.Start)
       .layoutWeight(1)
@@ -176,6 +411,7 @@ struct Index {
           .fontSize(18)
           .fontWeight(FontWeight.Bold)
           .fontColor('#D32F2F')
+
         Text(bill.date)
           .fontSize(11)
           .fontColor('#999999')
@@ -186,9 +422,25 @@ struct Index {
     .padding(12)
     .backgroundColor('#FFFFFF')
     .borderRadius(8)
-    .margin({ left: '5%', right: '5%', top: 6, bottom: 6 })
-    .onClick(() => {
-      // 可添加编辑功能
+    .margin({
+      left: '5%',
+      right: '5%',
+      top: 6,
+      bottom: 6
+    })
+    .onClick(async () => {
+      await router.pushUrl({
+        url: 'pages/AddBillPage',
+        params: {
+          billId: String(bill.id),
+          amount: CurrencyUtil.fenToYuan(bill.amount),
+          category: bill.category,
+          date: bill.date,
+          remark: bill.remark || ''
+        }
+      });
+
+      await this.refreshData();
     })
   }
 
@@ -204,6 +456,7 @@ struct Index {
     .backgroundColor('#F44336')
     .onClick(async () => {
       await this.viewModel.deleteBill(bill.id);
+      await this.refreshData();
     })
   }
 }

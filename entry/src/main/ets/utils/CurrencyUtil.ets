@@ -43,3 +43,4 @@ export class CurrencyUtil {
     return !isNaN(num) && num >= 0 && num <= 99999999.99; // 最大9999.99万
   }
 }
+

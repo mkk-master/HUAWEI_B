@@ -16,6 +16,7 @@ struct StatisticsPage {
 
   async aboutToAppear(): Promise<void> {
     await this.viewModel.loadBills();
+    await this.viewModel.loadBudget();
   }
 
   build() {
