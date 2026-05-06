@@ -3,6 +3,7 @@
     "pages/Index",
     "pages/AddBillPage",
     "pages/StatisticsPage",
-    "pages/BudgetPage"
+    "pages/BudgetPage",
+    "pages/SpendingInsightPage"
   ]
 }

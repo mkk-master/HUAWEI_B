@@ -3,14 +3,14 @@
 import { http } from '@kit.NetworkKit';
 import { CloudAiConfig } from './CloudAiConfig';
 
-interface ChatMessage {
+export interface DashScopeChatMessage {
   role: string;
   content: string;
 }
 
 interface ChatCompletionRequestBody {
   model: string;
-  messages: ChatMessage[];
+  messages: DashScopeChatMessage[];
 }
 
 interface ChatCompletionMessage {
@@ -28,18 +28,22 @@ interface ChatCompletionResponse {
 }
 
 /**
- * 调用 DashScope 兼容模式的 chat.completions，返回助手文本（首条 choice）。
+ * 调用 DashScope 兼容模式的 chat.completions（多轮 messages）。
  */
-export async function dashScopeChatCompletion(apiKey: string, userContent: string): Promise<string> {
+export async function dashScopeChatCompletionMessages(apiKey: string,
+  messages: DashScopeChatMessage[]): Promise<string> {
   const trimmed = apiKey.trim();
   if (trimmed.length === 0) {
     throw new Error('DashScope apiKey 为空');
+  }
+  if (messages.length === 0) {
+    throw new Error('messages 为空');
   }
 
   const url = `${CloudAiConfig.COMPAT_BASE_URL}/chat/completions`;
   const body: ChatCompletionRequestBody = {
     model: CloudAiConfig.CHAT_MODEL,
-    messages: [{ role: 'user', content: userContent }]
+    messages: messages
   };
 
   const httpRequest = http.createHttp();
@@ -75,4 +79,11 @@ export async function dashScopeChatCompletion(apiKey: string, userContent: strin
   } finally {
     httpRequest.destroy();
   }
+}
+
+/**
+ * 单条 user 消息的便捷封装。
+ */
+export async function dashScopeChatCompletion(apiKey: string, userContent: string): Promise<string> {
+  return dashScopeChatCompletionMessages(apiKey, [{ role: 'user', content: userContent }]);
 }

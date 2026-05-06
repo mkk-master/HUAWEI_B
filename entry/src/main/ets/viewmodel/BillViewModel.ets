@@ -342,4 +342,69 @@ export class BillViewModel {
       } as CategorySummary;
     });
   }
+
+  /**
+   * 生成某月全量账单的纯文本摘要，供云端模型做消费分析（不受首页列表筛选影响）。
+   */
+  async buildMonthlyInsightDataText(month: string): Promise<string> {
+    if (!month || month.length !== 7) {
+      return '月份参数无效。';
+    }
+
+    const budgetFen = await this.dbHelper.getBudget(month);
+    const bills = await this.dbHelper.queryBills(month);
+    const totalFen = bills.reduce((sum: number, bill: BillModel) => {
+      return sum + bill.amount;
+    }, 0);
+
+    const byCat = new Map<string, number>();
+    bills.forEach((bill: BillModel) => {
+      const cur = byCat.get(bill.category) || 0;
+      byCat.set(bill.category, cur + bill.amount);
+    });
+
+    const sortedCats = Array.from(byCat.entries()).sort((a: [string, number], b: [string, number]) => {
+      return b[1] - a[1];
+    });
+
+    const lines: string[] = [];
+    lines.push(`月份：${month}`);
+    lines.push(`账单笔数：${bills.length}`);
+    lines.push(`月度预算：${CurrencyUtil.fenToYuan(budgetFen)} 元（若为 0 表示未设置预算）`);
+    lines.push(`当月支出合计：${CurrencyUtil.fenToYuan(totalFen)} 元`);
+    const remainFen = budgetFen - totalFen;
+    lines.push(`预算剩余：${CurrencyUtil.fenToYuan(remainFen)} 元（负数表示超支）`);
+    if (budgetFen > 0) {
+      lines.push(`预算执行进度：${((totalFen / budgetFen) * 100).toFixed(1)}%`);
+    } else {
+      lines.push('预算执行进度：未设置预算');
+    }
+
+    lines.push('');
+    lines.push('分类支出（元）：');
+    sortedCats.forEach((pair: [string, number]) => {
+      const cat = pair[0];
+      const fen = pair[1];
+      const pct = totalFen > 0 ? ((fen / totalFen) * 100).toFixed(1) : '0';
+      lines.push(`- ${cat}：${CurrencyUtil.fenToYuan(fen)}（占当月支出 ${pct}%）`);
+    });
+
+    const sortedBills = [...bills].sort((a: BillModel, b: BillModel) => {
+      return b.amount - a.amount;
+    }).slice(0, 15);
+
+    lines.push('');
+    lines.push('单笔金额较高的账单（最多 15 条）：');
+    if (sortedBills.length === 0) {
+      lines.push('- （无）');
+    } else {
+      sortedBills.forEach((bill: BillModel) => {
+        lines.push(
+          `- ${bill.date}｜${bill.category}｜${CurrencyUtil.fenToYuan(bill.amount)} 元｜备注：${bill.remark || '无'}`
+        );
+      });
+    }
+
+    return lines.join('\n');
+  }
 }

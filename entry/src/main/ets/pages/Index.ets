@@ -140,9 +140,27 @@ struct Index {
       .height(40)
       .backgroundColor('#F0F0F0')
       .borderRadius(20)
+      .margin({ right: 8 })
       .onClick(async () => {
         await router.pushUrl({
           url: 'pages/BudgetPage',
+          params: {
+            month: this.viewModel.currentMonth
+          }
+        });
+      })
+
+      Button() {
+        Text('✨')
+          .fontSize(20)
+      }
+      .width(40)
+      .height(40)
+      .backgroundColor('#F0F0F0')
+      .borderRadius(20)
+      .onClick(async () => {
+        await router.pushUrl({
+          url: 'pages/SpendingInsightPage',
           params: {
             month: this.viewModel.currentMonth
           }
