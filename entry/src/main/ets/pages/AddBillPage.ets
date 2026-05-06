@@ -4,8 +4,14 @@ import { CategoryType } from '../model/BillModel';
 import { CurrencyUtil } from '../utils/CurrencyUtil';
 import { DatabaseHelper } from '../database/DatabaseHelper';
 import { LocalModelClassifier } from '../utils/LocalModelClassifier';
+import { CloudAiConfig } from '../utils/CloudAiConfig';
+import { predictBillCategoryCloud } from '../utils/CloudBillCategoryHelper';
 import promptAction from '@ohos.promptAction';
 import router from '@ohos.router';
+import dataPreferences from '@ohos.data.preferences';
+
+const PREFERENCES_NAME: string = 'count1_prefs';
+const PREF_KEY_DASHSCOPE_API: string = 'dashscope_api_key';
 
 interface DatePickerResult {
   year: number;
@@ -26,6 +32,7 @@ struct AddBillPage {
   @State pageTitle: string = '记一笔';
   @State suggestedCategory: string = '';
   @State isPredicting: boolean = false;
+  @State cloudApiKeyInput: string = '';
 
   private viewModel: BillViewModel = new BillViewModel();
   private categoryArray: CategoryType[] = Object.values(CategoryType);
@@ -62,6 +69,7 @@ struct AddBillPage {
   async aboutToAppear(): Promise<void> {
     await this.dbHelper.initDatabase(getContext(this));
     await this.viewModel.init();
+    await this.loadCloudApiKeyFromPreferences();
     await this.classifier.initModel().catch((err:Error)=> {
       console.error('模型预初始化失败', err);
     });
@@ -94,6 +102,28 @@ struct AddBillPage {
     }
   }
 
+  async loadCloudApiKeyFromPreferences(): Promise<void> {
+    try {
+      const pref = await dataPreferences.getPreferences(getContext(this), PREFERENCES_NAME);
+      const saved = await pref.get(PREF_KEY_DASHSCOPE_API, '') as string;
+      this.cloudApiKeyInput = saved;
+      CloudAiConfig.apiKey = saved.trim();
+    } catch (e) {
+      console.error('读取云端 AI Key 失败', e);
+    }
+  }
+
+  async persistCloudApiKey(value: string): Promise<void> {
+    try {
+      const pref = await dataPreferences.getPreferences(getContext(this), PREFERENCES_NAME);
+      await pref.put(PREF_KEY_DASHSCOPE_API, value);
+      await pref.flush();
+      CloudAiConfig.apiKey = value.trim();
+    } catch (e) {
+      console.error('保存云端 AI Key 失败', e);
+    }
+  }
+
   async onRemarkChange(value: string) {
     this.remark = value;
     // 当备注长度大于2且金额有效时，触发智能预测
@@ -116,7 +146,11 @@ struct AddBillPage {
     const amountCent = Math.round(parseFloat(this.amountInput) * 100);
 
     try {
-      const category = await this.classifier.predictCategory(amountCent, this.remark);
+      let category: CategoryType | null = await predictBillCategoryCloud(CloudAiConfig.apiKey, amountCent,
+        this.remark);
+      if (category === null) {
+        category = await this.classifier.predictCategory(amountCent, this.remark);
+      }
       this.suggestedCategory = category;
 
       promptAction.showToast({
@@ -303,6 +337,29 @@ struct AddBillPage {
             }
             .margin({ top: 8 })
           }
+
+          Text('DashScope API Key（可选，优先云端分类；仅保存在本机）')
+            .fontSize(12)
+            .fontColor('#999999')
+            .alignSelf(ItemAlign.Start)
+            .margin({ top: 16 })
+
+          TextInput({
+            placeholder: 'sk-…',
+            text: this.cloudApiKeyInput
+          })
+            .fontSize(12)
+            .height(40)
+            .backgroundColor('#F5F5F5')
+            .borderRadius(8)
+            .padding({ left: 12, right: 12 })
+            .onChange((value: string) => {
+              this.cloudApiKeyInput = value;
+              CloudAiConfig.apiKey = value.trim();
+            })
+            .onBlur(() => {
+              void this.persistCloudApiKey(this.cloudApiKeyInput);
+            })
         }
         .width('90%')
         .margin({ top: 24 })
