@@ -10,9 +10,18 @@ interface CategorySummary {
 
 export class BillViewModel {
   private dbHelper: DatabaseHelper = DatabaseHelper.getInstance();
+
+  // 当前页面列表显示的账单，可以被搜索关键字、类型筛选影响
   public bills: BillModel[] = [];
+
+  // 当前查看的月份，例如 2026-04
   public currentMonth: string = '';
+
+  // 当前月份预算
   public monthlyBudget: number = 0;
+
+  // 当前月份全部账单总支出
+  // 注意：这个值不应该受分类筛选影响
   public monthlyTotal: number = 0;
 
   constructor() {
@@ -28,6 +37,7 @@ export class BillViewModel {
 
   private parseMonth(month: string): Date {
     const parts = month.split('-');
+
     if (parts.length !== 2) {
       return new Date();
     }
@@ -47,33 +57,59 @@ export class BillViewModel {
     await this.loadBudget();
   }
 
+  /**
+   * 加载账单列表
+   *
+   * 说明：
+   * 这里的 bills 是首页列表显示的数据，
+   * 可以受搜索关键字 keyword 和分类 category 影响。
+   *
+   * 但是预算条不应该使用这里的 bills 计算，
+   * 因为 bills 可能只是某一类账单。
+   */
   async loadBills(keyword?: string, category?: string): Promise<void> {
     try {
       console.info('Loading bills for month:', this.currentMonth, 'keyword:', keyword, 'category:', category);
 
       this.bills = await this.dbHelper.queryBills(this.currentMonth, keyword, category);
 
-      /*this.monthlyTotal = this.bills.reduce((sum: number, bill: BillModel) => {
-        return sum + bill.amount;
-      }, 0);*/
-
-      console.info('Loaded bills count:', this.bills.length, 'total:', this.monthlyTotal);
+      console.info('Loaded list bills count:', this.bills.length);
     } catch (error) {
       console.error('Error loading bills:', error);
       this.bills = [];
-      this.monthlyTotal = 0;
     }
   }
 
+  /**
+   * 加载预算条数据
+   *
+   * 关键修改：
+   * monthlyTotal 不再根据 this.bills 计算。
+   * 因为 this.bills 可能是筛选后的列表。
+   *
+   * 这里重新查询当前月份全部账单：
+   * this.dbHelper.queryBills(this.currentMonth)
+   *
+   * 不传 keyword，也不传 category，
+   * 所以预算条永远统计当前月份所有账单。
+   */
   async loadBudget(): Promise<void> {
     try {
       this.monthlyBudget = await this.dbHelper.getBudget(this.currentMonth);
-      this.monthlyTotal = this.bills.reduce((sum: number, bill: BillModel) => {
+
+      const allMonthBills = await this.dbHelper.queryBills(this.currentMonth);
+
+      this.monthlyTotal = allMonthBills.reduce((sum: number, bill: BillModel) => {
         return sum + bill.amount;
       }, 0);
+
+      console.info(
+        `Budget loaded: month=${this.currentMonth}, budget=${this.monthlyBudget}, total=${this.monthlyTotal}`
+      );
     } catch (error) {
       console.error('Error loading budget:', error);
       this.monthlyBudget = 0;
+      this.monthlyTotal = 0;
     }
   }
 
@@ -84,6 +120,7 @@ export class BillViewModel {
     }
 
     this.currentMonth = month;
+
     await this.loadBills(keyword, category);
     await this.loadBudget();
   }
@@ -93,6 +130,7 @@ export class BillViewModel {
     date.setMonth(date.getMonth() - 1);
 
     this.currentMonth = this.formatMonth(date);
+
     await this.loadBills(keyword, category);
     await this.loadBudget();
   }
@@ -102,6 +140,7 @@ export class BillViewModel {
     date.setMonth(date.getMonth() + 1);
 
     this.currentMonth = this.formatMonth(date);
+
     await this.loadBills(keyword, category);
     await this.loadBudget();
   }
@@ -144,6 +183,8 @@ export class BillViewModel {
       }
 
       await this.loadBills();
+      await this.loadBudget();
+
       return true;
     } catch (error) {
       console.error('Error adding bill:', error);
@@ -159,13 +200,21 @@ export class BillViewModel {
       }
 
       await this.dbHelper.deleteBill(id);
+
       await this.loadBills();
+      await this.loadBudget();
     } catch (error) {
       console.error('Error deleting bill:', error);
     }
   }
 
-  async updateBill(id: number, amountYuan: string, category: CategoryType, date: string, remark: string): Promise<boolean> {
+  async updateBill(
+    id: number,
+    amountYuan: string,
+    category: CategoryType,
+    date: string,
+    remark: string
+  ): Promise<boolean> {
     try {
       if (id === undefined || id === null || id < 0) {
         console.error('Invalid bill id when updating:', id);
@@ -200,6 +249,8 @@ export class BillViewModel {
       }
 
       await this.loadBills();
+      await this.loadBudget();
+
       return true;
     } catch (error) {
       console.error('Error updating bill:', error);
@@ -208,7 +259,16 @@ export class BillViewModel {
   }
 
   async setBudget(totalBudgetYuan: string): Promise<boolean> {
+    return await this.setBudgetForMonth(this.currentMonth, totalBudgetYuan);
+  }
+
+  async setBudgetForMonth(month: string, totalBudgetYuan: string): Promise<boolean> {
     try {
+      if (!month || month.length !== 7) {
+        console.error('Invalid budget month:', month);
+        return false;
+      }
+
       const budgetFen = CurrencyUtil.yuanToFen(totalBudgetYuan);
 
       if (isNaN(budgetFen)) {
@@ -217,16 +277,33 @@ export class BillViewModel {
       }
 
       const budget = new BudgetModel();
-      budget.month = this.currentMonth;
+      budget.month = month;
       budget.totalBudget = budgetFen;
 
       await this.dbHelper.setBudget(budget);
-      this.monthlyBudget = budgetFen;
+
+      if (month === this.currentMonth) {
+        this.monthlyBudget = budgetFen;
+      }
 
       return true;
     } catch (error) {
-      console.error('Error setting budget:', error);
+      console.error('Error setting budget for month:', error);
       return false;
+    }
+  }
+
+  async getBudgetForMonth(month: string): Promise<number> {
+    try {
+      if (!month || month.length !== 7) {
+        console.error('Invalid month when getting budget:', month);
+        return 0;
+      }
+
+      return await this.dbHelper.getBudget(month);
+    } catch (error) {
+      console.error('Error getting budget for month:', error);
+      return 0;
     }
   }
 
@@ -242,6 +319,14 @@ export class BillViewModel {
     return Math.min(this.monthlyTotal / this.monthlyBudget, 1.0);
   }
 
+  /**
+   * 分类统计
+   *
+   * 这里仍然基于 this.bills，
+   * 所以它会跟随当前首页筛选结果变化。
+   * 如果你希望统计页也永远统计整月全部账单，
+   * 后面可以单独再改 StatisticsPage。
+   */
   getCategorySummary(): Array<CategorySummary> {
     const summaryMap = new Map<string, number>();
 

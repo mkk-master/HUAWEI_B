@@ -3,6 +3,8 @@ import { BillViewModel } from '../viewmodel/BillViewModel';
 import { CategoryType } from '../model/BillModel';
 import { CurrencyUtil } from '../utils/CurrencyUtil';
 import { DatabaseHelper } from '../database/DatabaseHelper';
+import { LocalModelClassifier } from '../utils/LocalModelClassifier';
+import promptAction from '@ohos.promptAction';
 import router from '@ohos.router';
 
 interface DatePickerResult {
@@ -22,11 +24,13 @@ struct AddBillPage {
   @State isEdit: boolean = false;
   @State editBillId: number = -1;
   @State pageTitle: string = '记一笔';
+  @State suggestedCategory: string = '';
+  @State isPredicting: boolean = false;
 
   private viewModel: BillViewModel = new BillViewModel();
   private categoryArray: CategoryType[] = Object.values(CategoryType);
   private dbHelper: DatabaseHelper = DatabaseHelper.getInstance();
-
+  private classifier = LocalModelClassifier.getInstance();
   private formatDate(date: Date): string {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -58,7 +62,9 @@ struct AddBillPage {
   async aboutToAppear(): Promise<void> {
     await this.dbHelper.initDatabase(getContext(this));
     await this.viewModel.init();
-
+    await this.classifier.initModel().catch((err:Error)=> {
+      console.error('模型预初始化失败', err);
+    });
     const params = router.getParams() as Record<string, Object>;
 
     if (params && params['billId'] !== undefined && params['billId'] !== null) {
@@ -85,6 +91,42 @@ struct AddBillPage {
       this.pageTitle = '记一笔';
       this.date = this.formatDate(new Date());
       this.remark = '';
+    }
+  }
+
+  async onRemarkChange(value: string) {
+    this.remark = value;
+    // 当备注长度大于2且金额有效时，触发智能预测
+    if (value.length >= 1 && parseFloat(this.amountInput) > 0) {
+      await this.smartPredict();
+    }
+  }
+
+  async onAmountChange(value: string) {
+    //this.amount = value;
+    if (this.remark.length > 2 && parseFloat(value) > 0) {
+      await this.smartPredict();
+    }
+  }
+
+  async smartPredict() {
+    if (this.isPredicting) return;
+
+    this.isPredicting = true;
+    const amountCent = Math.round(parseFloat(this.amountInput) * 100);
+
+    try {
+      const category = await this.classifier.predictCategory(amountCent, this.remark);
+      this.suggestedCategory = category;
+
+      promptAction.showToast({
+        message: `智能建议分类：${category}`,
+        duration: 2000
+      });
+    } catch (err) {
+      console.error('智能预测失败', err);
+    } finally {
+      this.isPredicting = false;
     }
   }
 
@@ -141,7 +183,7 @@ struct AddBillPage {
             })
             .onChange((value: string) => {
               this.amountInput = value;
-
+              this.onAmountChange(value);
               if (!value || value.trim().length === 0) {
                 this.amountError = '';
                 return;
@@ -248,10 +290,24 @@ struct AddBillPage {
             })
             .onChange((value: string) => {
               this.remark = value;
+              this.onRemarkChange(value);
             })
+          if (this.suggestedCategory) {
+            Row() {
+              Text('推荐分类：')
+                .fontSize(14)
+              Text(this.suggestedCategory)
+                .fontSize(14)
+                .fontColor('#007DFF')
+                .fontWeight(FontWeight.Bold)
+            }
+            .margin({ top: 8 })
+          }
         }
         .width('90%')
         .margin({ top: 24 })
+
+
 
         if (this.isEdit) {
           Button('删除账单')

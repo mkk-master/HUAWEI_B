@@ -1,4 +1,4 @@
-//文件路径: entry/src/main/ets/pages/Index.ets
+// 文件路径: entry/src/main/ets/pages/Index.ets
 import { BillViewModel } from '../viewmodel/BillViewModel';
 import { CurrencyUtil } from '../utils/CurrencyUtil';
 import { CategoryType } from '../model/BillModel';
@@ -30,6 +30,7 @@ struct Index {
   }
 
   onPageShow(): void {
+    // 从添加账单、预算、统计等页面返回首页时，重新加载当前月份数据
     this.refreshData();
   }
 
@@ -37,6 +38,8 @@ struct Index {
     try {
       await this.viewModel.loadBills(this.searchKeyword, this.filterCategory);
       await this.viewModel.loadBudget();
+
+      // 用于强制触发部分 UI 重新计算
       this.refreshFlag++;
     } catch (error) {
       console.error('Error refreshing data:', error);
@@ -59,10 +62,7 @@ struct Index {
   build() {
     Column() {
       this.buildHeader();
-
-      // 新增：月份选择栏
       this.buildMonthSelector();
-
       this.buildBudgetCard();
       this.buildSearchBar();
       this.buildActionButtons();
@@ -125,10 +125,11 @@ struct Index {
       .margin({ right: 8 })
       .onClick(async () => {
         await router.pushUrl({
-          url: 'pages/StatisticsPage'
+          url: 'pages/StatisticsPage',
+          params: {
+            month: this.viewModel.currentMonth
+          }
         });
-
-        await this.refreshData();
       })
 
       Button() {
@@ -141,10 +142,11 @@ struct Index {
       .borderRadius(20)
       .onClick(async () => {
         await router.pushUrl({
-          url: 'pages/BudgetPage'
+          url: 'pages/BudgetPage',
+          params: {
+            month: this.viewModel.currentMonth
+          }
         });
-
-        await this.refreshData();
       })
     }
     .width('90%')
@@ -287,8 +289,8 @@ struct Index {
         .onChange((value: string) => {
           this.searchKeyword = value;
         })
-        .onSubmit(() => {
-          this.viewModel.loadBills(this.searchKeyword, this.filterCategory);
+        .onSubmit(async () => {
+          await this.refreshData();
         })
 
       Select(this.categoryOptions)
@@ -302,14 +304,14 @@ struct Index {
         .width(100)
         .height(36)
         .margin({ left: 8 })
-        .onSelect((index: number, value?: string) => {
+        .onSelect(async (index: number, value?: string) => {
           if (index === 0) {
             this.filterCategory = '';
           } else {
             this.filterCategory = value || '';
           }
 
-          this.viewModel.loadBills(this.searchKeyword, this.filterCategory);
+          await this.refreshData();
         })
     }
     .width('90%')
@@ -338,8 +340,6 @@ struct Index {
         await router.pushUrl({
           url: 'pages/AddBillPage'
         });
-
-        await this.refreshData();
       })
 
       Blank()
@@ -360,10 +360,11 @@ struct Index {
       .borderRadius(24)
       .onClick(async () => {
         await router.pushUrl({
-          url: 'pages/StatisticsPage'
+          url: 'pages/StatisticsPage',
+          params: {
+            month: this.viewModel.currentMonth
+          }
         });
-
-        await this.refreshData();
       })
     }
     .width('90%')
@@ -439,8 +440,6 @@ struct Index {
           remark: bill.remark || ''
         }
       });
-
-      await this.refreshData();
     })
   }
 

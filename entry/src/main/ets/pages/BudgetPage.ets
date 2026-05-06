@@ -10,18 +10,94 @@ struct BudgetPage {
   @State budgetInput: string = '';
   @State currentBudget: string = '';
   @State inputError: string = '';
-  @State Budget_Tip:string ='';
+  @State Budget_Tip: string = '';
+  @State selectedMonth: string = this.formatMonth(new Date());
+  @State refreshFlag: number = 0;
+
   private viewModel: BillViewModel = new BillViewModel();
   private dbHelper: DatabaseHelper = DatabaseHelper.getInstance();
+
+  private formatMonth(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  }
+
+  private parseMonth(month: string): Date {
+    const parts = month.split('-');
+
+    if (parts.length !== 2) {
+      return new Date();
+    }
+
+    const year = Number(parts[0]);
+    const monthIndex = Number(parts[1]) - 1;
+
+    if (isNaN(year) || isNaN(monthIndex)) {
+      return new Date();
+    }
+
+    return new Date(year, monthIndex, 1);
+  }
+
+  private fenToPlainYuan(fen: number): string {
+    return (fen / 100).toFixed(2);
+  }
 
   async aboutToAppear(): Promise<void> {
     await this.dbHelper.initDatabase(getContext(this));
     await this.viewModel.init();
-    await this.viewModel.loadBudget();
-    this.currentBudget = CurrencyUtil.fenToYuan(this.viewModel.monthlyBudget);
-    this.budgetInput = this.currentBudget;
 
-    console.info('BudgetPage initialized, current budget:', this.currentBudget);
+    this.selectedMonth = this.viewModel.currentMonth;
+
+    const params = router.getParams() as Record<string, Object>;
+    if (params && params['month']) {
+      const monthParam = String(params['month']);
+      if (monthParam.length === 7) {
+        this.selectedMonth = monthParam;
+      }
+    }
+
+    await this.loadSelectedMonthBudget();
+
+    console.info('BudgetPage initialized, selected month:', this.selectedMonth, 'current budget:', this.currentBudget);
+  }
+
+  async loadSelectedMonthBudget(): Promise<void> {
+    const budgetFen = await this.viewModel.getBudgetForMonth(this.selectedMonth);
+
+    this.currentBudget = this.fenToPlainYuan(budgetFen);
+
+    if (budgetFen > 0) {
+      this.budgetInput = this.currentBudget;
+    } else {
+      this.budgetInput = '';
+    }
+
+    this.inputError = '';
+    this.refreshFlag++;
+  }
+
+  async goPreviousMonth(): Promise<void> {
+    const date = this.parseMonth(this.selectedMonth);
+    date.setMonth(date.getMonth() - 1);
+    this.selectedMonth = this.formatMonth(date);
+
+    await this.loadSelectedMonthBudget();
+  }
+
+  async goNextMonth(): Promise<void> {
+    const date = this.parseMonth(this.selectedMonth);
+    date.setMonth(date.getMonth() + 1);
+    this.selectedMonth = this.formatMonth(date);
+
+    await this.loadSelectedMonthBudget();
+  }
+
+  async goCurrentMonth(): Promise<void> {
+    this.selectedMonth = this.formatMonth(new Date());
+
+    await this.loadSelectedMonthBudget();
   }
 
   build() {
@@ -30,25 +106,92 @@ struct BudgetPage {
         Button('返回')
           .backgroundColor('#00000000')
           .fontColor('#4CAF50')
-          .onClick(() => router.back())
+          .onClick(() => {
+            router.back();
+          })
 
         Text('设置预算')
           .fontSize(18)
           .fontWeight(FontWeight.Bold)
           .layoutWeight(1)
           .textAlign(TextAlign.Center)
+
+        Blank()
+          .width(56)
       }
       .width('90%')
       .height(48)
 
+      Row() {
+        Button('上月')
+          .fontSize(13)
+          .height(36)
+          .backgroundColor('#F5F5F5')
+          .fontColor('#333333')
+          .borderRadius(18)
+          .onClick(async () => {
+            await this.goPreviousMonth();
+          })
+
+        Blank()
+
+        Text(this.selectedMonth)
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#333333')
+
+        Blank()
+
+        Button('下月')
+          .fontSize(13)
+          .height(36)
+          .backgroundColor('#F5F5F5')
+          .fontColor('#333333')
+          .borderRadius(18)
+          .onClick(async () => {
+            await this.goNextMonth();
+          })
+
+        Button('本月')
+          .fontSize(13)
+          .height(36)
+          .backgroundColor('#4CAF50')
+          .fontColor('#FFFFFF')
+          .borderRadius(18)
+          .margin({ left: 8 })
+          .onClick(async () => {
+            await this.goCurrentMonth();
+          })
+      }
+      .width('90%')
+      .height(44)
+      .margin({
+        top: 12,
+        bottom: 16
+      })
+
       Column() {
-        Text(`${this.viewModel.currentMonth} 月度预算`)
+        Text(`${this.selectedMonth} 月度预算`)
           .fontSize(16)
           .fontColor('#666666')
           .margin({ bottom: 16 })
 
-        TextInput({ placeholder: '请输入预算金额', text: this.budgetInput })
-          //.type(InputType.Number)
+        if (this.currentBudget !== '0.00') {
+          Text(`当前预算：${this.currentBudget} 元`)
+            .fontSize(14)
+            .fontColor('#999999')
+            .margin({ bottom: 16 })
+        } else {
+          Text('当前月份还没有设置预算')
+            .fontSize(14)
+            .fontColor('#999999')
+            .margin({ bottom: 16 })
+        }
+
+        TextInput({
+          placeholder: '请输入预算金额',
+          text: this.budgetInput
+        })
           .fontSize(36)
           .fontWeight(FontWeight.Bold)
           .textAlign(TextAlign.Center)
@@ -57,19 +200,14 @@ struct BudgetPage {
           .borderRadius(8)
           .padding(12)
           .onChange((value: string) => {
-            //this.checkoutInput();
             this.budgetInput = value;
+
             if (value.length > 0 && !CurrencyUtil.isValidAmount(value)) {
               this.inputError = '请输入有效金额（最多两位小数）';
             } else {
               this.inputError = '';
             }
           })
-
-       /* Text(this.Budget_Tip)
-          .fontColor('#F5222D')
-          .fontSize(18)
-          .margin(12)*/
 
         if (this.inputError) {
           Text(this.inputError)
@@ -87,8 +225,8 @@ struct BudgetPage {
         .justifyContent(FlexAlign.SpaceAround)
         .margin({ top: 24 })
 
-        Button('保存预算')
-          .width('60%')
+        Button(`保存 ${this.selectedMonth} 预算`)
+          .width('70%')
           .height(48)
           .fontSize(16)
           .backgroundColor('#4CAF50')
@@ -101,7 +239,7 @@ struct BudgetPage {
           })
       }
       .width('80%')
-      .margin({ top: 40 })
+      .margin({ top: 20 })
     }
     .width('100%')
     .height('100%')
@@ -115,7 +253,12 @@ struct BudgetPage {
       .backgroundColor('#E3F2FD')
       .fontColor('#1976D2')
       .borderRadius(8)
-      .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+      .padding({
+        left: 12,
+        right: 12,
+        top: 6,
+        bottom: 6
+      })
       .onClick(() => {
         this.budgetInput = amount;
         this.inputError = '';
@@ -123,42 +266,39 @@ struct BudgetPage {
   }
 
   async saveBudget(): Promise<void> {
-    console.info('saveBudget called, amount:', this.budgetInput);
+    console.info('saveBudget called, month:', this.selectedMonth, 'amount:', this.budgetInput);
 
-    // 验证金额
     if (!this.budgetInput || this.budgetInput.trim().length === 0) {
       this.inputError = '请输入预算金额';
-      console.error('Budget amount is empty');
       return;
     }
 
     if (!CurrencyUtil.isValidAmount(this.budgetInput)) {
       this.inputError = '请输入有效金额（最多两位小数）';
-      console.error('Invalid budget amount:', this.budgetInput);
       return;
     }
 
     try {
-      console.info('Setting budget:', this.budgetInput);
-      const success = await this.viewModel.setBudget(this.budgetInput);
-      console.info('Set budget result:', success);
+      const success = await this.viewModel.setBudgetForMonth(
+        this.selectedMonth,
+        this.budgetInput.trim()
+      );
 
       if (success) {
-        // 添加成功弹窗
+        await this.loadSelectedMonthBudget();
+
         AlertDialog.show({
           title: '保存成功',
-          message: '预算设置已更新',
+          message: `${this.selectedMonth} 的预算已更新`,
           confirm: {
             value: '确定',
             action: () => {
-              console.info('Budget saved, going back');
-              router.back(); // 关闭弹窗后返回上一页
+              router.back();
             }
           },
-          cancel: () => {} // 空取消回调
+          cancel: () => {}
         });
       } else {
-        console.error('Failed to save budget');
         this.inputError = '保存失败，请重试';
       }
     } catch (error) {
@@ -166,12 +306,4 @@ struct BudgetPage {
       this.inputError = '保存失败，请重试';
     }
   }
-
-  /*private checkoutInput() {
-    let num1 = Number(this.budgetInput);
-    if ((isNaN(num1) || num1 < 0) && this.budgetInput != "") {
-      this.Budget_Tip = "请输入大于 0 的数字";
-    }
-  }*/
-
 }
