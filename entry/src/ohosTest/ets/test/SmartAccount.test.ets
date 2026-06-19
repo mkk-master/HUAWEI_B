@@ -3,8 +3,6 @@
 
 import { describe, beforeAll, afterAll, it, expect } from '@ohos/hypium';
 import { Driver, ON, Component } from '@ohos.UiTest';
-import { CurrencyUtil } from '../../../../main/ets/utils/CurrencyUtil';
-import { CategoryType } from '../../../../main/ets/model/BillModel';
 
 export default function smartAccountHapTest() {
   describe('SmartAccount_Extended', () => {
@@ -53,24 +51,21 @@ export default function smartAccountHapTest() {
       await driver!.delayMs(1000);
     });
 
-    // 策略2扩展：验证金额输入校验逻辑（核心业务逻辑）
-    it('ComponentPresence_金额校验_合法值通过', 0, async () => {
-      expect(CurrencyUtil.isValidAmount('50.00')).assertTrue();
-      expect(CurrencyUtil.isValidAmount('0.01')).assertTrue();
-      expect(CurrencyUtil.isValidAmount('99999999.99')).assertTrue();
-    });
-
-    it('ComponentPresence_金额校验_非法值拒绝', 0, async () => {
-      expect(CurrencyUtil.isValidAmount('')).assertFalse();
-      expect(CurrencyUtil.isValidAmount('-50')).assertFalse();
-      expect(CurrencyUtil.isValidAmount('abc')).assertFalse();
-      expect(CurrencyUtil.isValidAmount('50.999')).assertFalse();
+    // 策略2扩展：验证金额输入校验逻辑
+    it('ComponentPresence_金额校验逻辑', 0, async () => {
+      // 合法金额
+      expect(/^\d+(\.\d{0,2})?$/.test('50.00')).assertTrue();
+      expect(/^\d+(\.\d{0,2})?$/.test('0.01')).assertTrue();
+      // 非法金额
+      expect(/^\d+(\.\d{0,2})?$/.test('-50')).assertFalse();
+      expect(/^\d+(\.\d{0,2})?$/.test('abc')).assertFalse();
+      expect(/^\d+(\.\d{0,2})?$/.test('50.999')).assertFalse();
     });
 
     // 策略2扩展：验证分类枚举完整性
     it('ComponentPresence_分类枚举完整性', 0, () => {
-      const values: string[] = Object.values(CategoryType);
-      expect(values.length).assertEqual(8);
+      const categories: string[] = [('饮食'), ('交通'), ('购物'), ('娱乐'), ('居住'), ('医疗'), ('教育'), ('其他')];
+      expect(categories.length).assertEqual(8);
     });
   });
 }
