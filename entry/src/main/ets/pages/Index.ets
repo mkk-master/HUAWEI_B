@@ -4,6 +4,7 @@ import { CurrencyUtil } from '../utils/CurrencyUtil';
 import { BillModel, CategoryType, CategoryColors } from '../model/BillModel';
 import { DatabaseHelper } from '../database/DatabaseHelper';
 import router from '@ohos.router';
+import { display } from '@ohos.display';
 
 interface SelectOption {
   value: ResourceStr;
@@ -51,6 +52,27 @@ struct Index {
     }
   }
 
+  /**
+   * 双保险判断平板布局：
+   * 1. 优先用 @StorageLink 断点（系统响应式机制）
+   * 2. 退回 display API 读屏幕物理宽度（≥ 600vp 视为平板）
+   */
+  private isTabletLayout(): boolean {
+    if (this.currentBreakpoint === 'md' || this.currentBreakpoint === 'lg' || this.currentBreakpoint === 'xl') {
+      return true;
+    }
+    try {
+      const dsp = display.getDefaultDisplaySync();
+      const widthVp = px2vp(dsp.width);
+      if (widthVp >= 600) {
+        return true;
+      }
+    } catch (e) {
+      // display API 不可用时仅依赖断点
+    }
+    return false;
+  }
+
   private createCategoryOptions(): SelectOption[] {
     const options: SelectOption[] = [
       { value: '全部类型' as ResourceStr }
@@ -65,7 +87,7 @@ struct Index {
   }
 
   build() {
-    if (this.currentBreakpoint === 'md' || this.currentBreakpoint === 'lg' || this.currentBreakpoint === 'xl') {
+    if (this.isTabletLayout()) {
       // ===== 平板模式：双栏布局 =====
       SideBarContainer(SideBarContainerType.Embed) {
         // 左侧栏：账单列表 + 搜索/筛选
