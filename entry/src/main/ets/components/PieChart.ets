@@ -1,5 +1,4 @@
 // 文件路径: entry/src/main/ets/components/PieChart.ets
-import { drawing } from '@kit.ArkGraphics2D';
 import { CategoryColors } from '../model/BillModel';
 
 // 定义饼图数据项接口
@@ -18,19 +17,31 @@ export struct PieChart {
   // 外部传入的饼图数据（变化时需重绘 Canvas；onReady 仅首次触发）
   @Prop @Watch('onDataChange') data: Array<PieDataItem> = [];
   @Prop labelColor: string = '#888888';
+  @Prop isTablet: boolean = false;
   private canvasReady: boolean = false;
 
   private onDataChange(): void {
+    this.updateCanvasSize();
     if (this.canvasReady) {
       this.drawPieChart();
+    }
+  }
+
+  private updateCanvasSize(): void {
+    if (this.isTablet) {
+      this.canvasWidth = 540;
+      this.canvasHeight = 460;
+    } else {
+      this.canvasWidth = 340;
+      this.canvasHeight = 290;
     }
   }
   // Canvas 绘图上下文配置
   private settings: RenderingContextSettings = new RenderingContextSettings(true);
   private context: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings);
-  // Canvas 宽高
-  @State canvasWidth: number = 380;
-  @State canvasHeight: number = 380;
+  // Canvas 宽高（根据设备自适应）
+  @State canvasWidth: number = 360;
+  @State canvasHeight: number = 320;
 
   build() {
     // 外层Column包裹饼图和下方的详情列表，统一设置样式
@@ -42,7 +53,8 @@ export struct PieChart {
         .height(this.canvasHeight)
         .onReady(() => {
           this.canvasReady = true;
-          this.drawPieChart(); // Canvas就绪后绘制饼图
+          this.updateCanvasSize();
+          this.drawPieChart();
         })
 
       // 详情页面（标签）放在饼图下方
@@ -103,7 +115,16 @@ export struct PieChart {
     const ctx = this.context;
     const centerX = this.canvasWidth / 2;
     const centerY = this.canvasHeight / 2;
-    const radius = Math.min(centerX, centerY) - 55;
+    const isTablet = this.isTablet;
+    // 两套参数，确保标签完整显示
+    const radius = isTablet ? 140 : 95;
+    const labelFont = isTablet ? '22px sans-serif' : '16px sans-serif';
+    const bendBase = isTablet ? 12 : 8;
+    const extBase = isTablet ? 16 : 8;
+    const textPad = isTablet ? 5 : 3;
+    const labelThreshold = isTablet ? 0.03 : 0.06;
+    const levelBendStep = isTablet ? 12 : 8;
+    const levelExtStep = isTablet ? 6 : 3;
 
     ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
 
@@ -140,7 +161,7 @@ export struct PieChart {
       const isTiny = sliceAngle < 0.12;
       const explode = isTiny ? 5 : 0;
       const midAngle = curAngle + sliceAngle / 2;
-      if (sliceAngle > 0.03) {
+      if (sliceAngle > labelThreshold) {
         labels.push({
           midAngle: midAngle,
           percent: ((item.amount / total) * 100).toFixed(1) + '%',
@@ -176,8 +197,8 @@ export struct PieChart {
             const prev = sideLabels[j];
             const prevLevel = map.get(prev) ?? 0;
             if (prevLevel === level) {
-              const prevY = centerY + prev.offY + Math.sin(prev.midAngle) * (radius + 12);
-              const curY = centerY + l.offY + Math.sin(l.midAngle) * (radius + 12);
+              const prevY = centerY + prev.offY + Math.sin(prev.midAngle) * (radius + bendBase);
+              const curY = centerY + l.offY + Math.sin(l.midAngle) * (radius + bendBase);
               if (Math.abs(curY - prevY) < MIN_GAP) {
                 placed = false;
                 level++;
@@ -220,18 +241,18 @@ export struct PieChart {
       ctx.stroke();
 
       // 标签 + 引线
-      if (sliceAngle > 0.03) {
+      if (sliceAngle > labelThreshold) {
         const info = labels[labelIdx];
         const level = allLevels.get(info) ?? 0;
         const textSide: number = Math.cos(midAngle) >= 0 ? 1 : -1;
 
         const edgeX = centerX + offX + Math.cos(midAngle) * radius;
         const edgeY = centerY + offY + Math.sin(midAngle) * radius;
-        const baseDist = radius + 12;
-        const bendDist = baseDist + level * 18;
+        const baseDist = radius + bendBase;
+        const bendDist = baseDist + level * levelBendStep;
         const bendX = centerX + offX + Math.cos(midAngle) * bendDist;
         const bendY = centerY + offY + Math.sin(midAngle) * bendDist;
-        const textX = bendX + textSide * (26 + level * 10);
+        const textX = bendX + textSide * (extBase + level * levelExtStep);
         const textY = bendY;
 
         ctx.beginPath();
@@ -239,14 +260,14 @@ export struct PieChart {
         ctx.lineTo(bendX, bendY);
         ctx.lineTo(textX, textY);
         ctx.strokeStyle = '#C0C0C0';
-        ctx.lineWidth = 0.8;
+        ctx.lineWidth = 0.7;
         ctx.stroke();
 
-        ctx.font = '22px sans-serif';
+        ctx.font = labelFont;
         ctx.fillStyle = this.labelColor;
         ctx.textBaseline = 'middle';
         ctx.textAlign = textSide >= 0 ? 'left' : 'right';
-        ctx.fillText(info.percent, textX + textSide * 5, textY);
+        ctx.fillText(info.percent, textX + textSide * textPad, textY);
 
         labelIdx++;
       }
