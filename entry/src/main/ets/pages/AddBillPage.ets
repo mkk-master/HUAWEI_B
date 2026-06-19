@@ -25,7 +25,7 @@ struct AddBillPage {
   @State amountInput: string = '';
   @State selectedCategory: CategoryType = CategoryType.FOOD;
   @State date: string = this.formatDate(new Date());
-  @State remark: string = '';
+  @State remarkInput: string = '';
   @State amountError: string = '';
   @State isEdit: boolean = false;
   @State editBillId: number = -1;
@@ -94,7 +94,7 @@ struct AddBillPage {
         this.date = this.formatDate(new Date());
       }
 
-      this.remark = String(params['remark'] || '');
+      this.remarkInput = String(params['remark'] || '');
 
       console.info(`Edit bill page opened, billId=${this.editBillId}, date=${this.date}`);
     } else {
@@ -102,7 +102,7 @@ struct AddBillPage {
       this.editBillId = -1;
       this.pageTitle = '记一笔';
       this.date = this.formatDate(new Date());
-      this.remark = '';
+      this.remarkInput = '';
     }
   }
 
@@ -133,7 +133,7 @@ struct AddBillPage {
 
   // 触发智能预测（同步入口，不会阻塞 onChange 状态更新）
   private triggerPredict(): void {
-    const hasRemark: boolean = this.remark.length >= 1;
+    const hasRemark: boolean = this.remarkInput.length >= 1;
     const hasAmount: boolean = parseFloat(this.amountInput) > 0;
     if (hasRemark && hasAmount) {
       this.smartPredict();
@@ -147,7 +147,7 @@ struct AddBillPage {
 
   // 金额变化：只触发预测
   onAmountChange(_value: string): void {
-    if (this.remark.length > 2) {
+    if (this.remarkInput.length > 2) {
       this.triggerPredict();
     }
   }
@@ -161,7 +161,7 @@ struct AddBillPage {
     try {
       let category: CategoryType | null = null;
       if (category === null) {
-        category = await this.classifier.predictCategory(amountCent, this.remark, getContext(this));
+        category = await this.classifier.predictCategory(amountCent, this.remarkInput, getContext(this));
       }
       this.suggestedCategory = category;
 
@@ -323,7 +323,7 @@ struct AddBillPage {
 
           TextInput({
             placeholder: '添加备注（可选）',
-            text: this.remark
+            text: this.remarkInput
           })
             .maxLength(50)
             .fontSize(14)
@@ -335,7 +335,7 @@ struct AddBillPage {
               right: 12
             })
             .onChange((value: string) => {
-              this.remark = value;
+              this.remarkInput = value;
               this.onRemarkChange(value);
             })
           if (this.suggestedCategory) {
@@ -438,14 +438,14 @@ struct AddBillPage {
           this.amountInput.trim(),
           this.selectedCategory,
           this.date.trim(),
-          this.remark.trim()
+          this.remarkInput.trim()
         );
       } else {
         success = await this.viewModel.addBill(
           this.amountInput.trim(),
           this.selectedCategory,
           this.date.trim(),
-          this.remark.trim()
+          this.remarkInput.trim()
         );
       }
 
