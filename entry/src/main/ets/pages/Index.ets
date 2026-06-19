@@ -132,6 +132,9 @@ struct Index {
             .layoutWeight(1)
             .backgroundColor('#F5F5F5')
           }
+
+          // 底部操作按钮
+          this.buildActionButtons()
         }
         .width('100%')
         .height('100%')
@@ -577,6 +580,55 @@ struct Index {
         .fontColor('#333333')
 
       Blank()
+
+      // 统计、预算、AI洞察导航按钮
+      Button() {
+        Text('📊')
+          .fontSize(18)
+      }
+      .width(36)
+      .height(36)
+      .backgroundColor('#F0F0F0')
+      .borderRadius(18)
+      .margin({ right: 6 })
+      .onClick(async () => {
+        await router.pushUrl({
+          url: 'pages/StatisticsPage',
+          params: { month: this.viewModel.currentMonth }
+        });
+      })
+
+      Button() {
+        Text('💰')
+          .fontSize(18)
+      }
+      .width(36)
+      .height(36)
+      .backgroundColor('#F0F0F0')
+      .borderRadius(18)
+      .margin({ right: 6 })
+      .onClick(async () => {
+        await router.pushUrl({
+          url: 'pages/BudgetPage',
+          params: { month: this.viewModel.currentMonth }
+        });
+      })
+
+      Button() {
+        Text('✨')
+          .fontSize(18)
+      }
+      .width(36)
+      .height(36)
+      .backgroundColor('#F0F0F0')
+      .borderRadius(18)
+      .margin({ right: 10 })
+      .onClick(async () => {
+        await router.pushUrl({
+          url: 'pages/SpendingInsightPage',
+          params: { month: this.viewModel.currentMonth }
+        });
+      })
 
       Button() {
         Text('+ 记一笔')
