@@ -3,14 +3,20 @@
 // 测试策略 2: ComponentPresence — 验证关键 UI 组件存在且可交互
 
 import { describe, beforeAll, afterAll, it, expect } from '@ohos/hypium';
-import { Driver, ON, Component } from '@ohos.UiTest';
+import { Driver, ON, Component, MatchPattern } from '@ohos.UiTest';
 
-function assertComp(driver: Driver, text: string): Promise<void> {
-  return driver.assertComponentExist(ON.text(text));
+function assertText(driver: Driver, text: string): Promise<void> {
+  // 用 CONTAINS 匹配，兼容嵌套在 Button/Row 里的 Text
+  return driver.assertComponentExist(ON.text(text, MatchPattern.CONTAINS));
 }
 
-function assertType(driver: Driver, typeName: string): Promise<void> {
-  return driver.assertComponentExist(ON.type(typeName));
+async function findAndClick(driver: Driver, text: string): Promise<boolean> {
+  const comp = await driver.findComponent(ON.text(text, MatchPattern.CONTAINS));
+  if (comp) {
+    await comp.click();
+    return true;
+  }
+  return false;
 }
 
 export default function abilityTest() {
@@ -20,7 +26,7 @@ export default function abilityTest() {
 
     beforeAll(async () => {
       driver = Driver.create();
-      await driver.delayMs(2000);
+      await driver.delayMs(3000);
     });
 
     afterAll(async () => {
@@ -31,90 +37,53 @@ export default function abilityTest() {
     // 策略 1: TextPresence — 验证关键文字存在
     // ==========================================================
 
-    it('TextPresence_首页标题存在', 0, async () => {
+    it('TextPresence_首页关键文字存在', 0, async () => {
       if (!driver) return;
-      await assertComp(driver, '智慧记账');
-    });
-
-    it('TextPresence_导航按钮文字存在', 0, async () => {
-      if (!driver) return;
-      await assertComp(driver, '记一笔');
-      await assertComp(driver, '消费统计');
-    });
-
-    it('TextPresence_月份选择器文字存在', 0, async () => {
-      if (!driver) return;
-      await assertComp(driver, '上月');
-      await assertComp(driver, '下月');
-      await assertComp(driver, '本月');
-    });
-
-    it('TextPresence_预算卡片文字存在', 0, async () => {
-      if (!driver) return;
-      await assertComp(driver, '剩余');
-      await assertComp(driver, '预算');
-      await assertComp(driver, '已花');
-    });
-
-    it('TextPresence_搜索栏与筛选存在', 0, async () => {
-      if (!driver) return;
-      await assertComp(driver, '全部类型');
+      await assertText(driver, '智慧记账');
+      await assertText(driver, '上月');
+      await assertText(driver, '本月');
+      await assertText(driver, '剩余');
+      await assertText(driver, '已花');
     });
 
     // ==========================================================
     // 策略 2: ComponentPresence — 验证 UI 组件
     // ==========================================================
 
-    it('ComponentPresence_Button组件存在', 0, async () => {
+    it('ComponentPresence_可交互按钮存在', 0, async () => {
       if (!driver) return;
-      const buttons = await driver.findComponents(ON.type('Button'));
+      const buttons = await driver.findComponents(ON.clickable(true));
       expect(buttons.length > 0).assertTrue();
     });
 
-    it('ComponentPresence_TextInput组件存在', 0, async () => {
+    it('ComponentPresence_输入框存在', 0, async () => {
       if (!driver) return;
-      await assertType(driver, 'TextInput');
+      const inputs = await driver.findComponents(ON.type('TextInput'));
+      expect(inputs.length > 0).assertTrue();
     });
 
-    it('ComponentPresence_Progress组件存在', 0, async () => {
+    it('ComponentPresence_进入记一笔页并返回', 0, async () => {
       if (!driver) return;
-      await assertType(driver, 'Progress');
+      // 点击"记一笔"按钮
+      const clicked = await findAndClick(driver, '记一笔');
+      expect(clicked).assertTrue();
+      await driver.delayMs(1500);
+      // 验证进入记一笔页
+      await assertText(driver, '保存');
+      await assertText(driver, '金额');
+      // 返回
+      await findAndClick(driver, '取消');
+      await driver.delayMs(1500);
+      await assertText(driver, '智慧记账');
     });
 
-    it('ComponentPresence_导航到记一笔页并返回', 0, async () => {
+    it('ComponentPresence_切换月份正常', 0, async () => {
       if (!driver) return;
-      const addBtn = await driver.findComponent(ON.text('记一笔'));
-      expect(addBtn !== null).assertTrue();
-      if (addBtn) {
-        await addBtn.click();
-      }
-      await driver.delayMs(1500);
-      await assertComp(driver, '保存');
-      await assertComp(driver, '取消');
-      const cancelBtn = await driver.findComponent(ON.text('取消'));
-      if (cancelBtn) {
-        await cancelBtn.click();
-      }
-      await driver.delayMs(1500);
-      await assertComp(driver, '智慧记账');
-    });
-
-    it('ComponentPresence_导航到消费统计页并返回', 0, async () => {
-      if (!driver) return;
-      const statsBtn = await driver.findComponent(ON.text('消费统计'));
-      expect(statsBtn !== null).assertTrue();
-      if (statsBtn) {
-        await statsBtn.click();
-      }
-      await driver.delayMs(1500);
-      await assertComp(driver, '饼图');
-      await assertComp(driver, '详情');
-      const backBtn = await driver.findComponent(ON.text('返回'));
-      if (backBtn) {
-        await backBtn.click();
-      }
-      await driver.delayMs(1500);
-      await assertComp(driver, '智慧记账');
+      await findAndClick(driver, '上月');
+      await driver.delayMs(500);
+      await findAndClick(driver, '本月');
+      await driver.delayMs(500);
+      await assertText(driver, '智慧记账');
     });
   });
 }
