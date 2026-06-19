@@ -155,7 +155,7 @@ struct StatisticsPage {
         Row() {
           Scroll() {
             Column() {
-              PieChart({ data: this.viewModel.getCategorySummary() })
+              PieChart({ data: this.viewModel.getCategorySummary(), isTablet: this.isTablet })
                 .key(`pie-tablet-${this.refreshFlag}`)
             }.width('100%')
           }
@@ -201,7 +201,7 @@ struct StatisticsPage {
         if (this.selectedTab === 0) {
           Scroll() {
             Column() {
-              PieChart({ data: this.viewModel.getCategorySummary() })
+              PieChart({ data: this.viewModel.getCategorySummary(), isTablet: this.isTablet })
                 .key(`pie-${this.refreshFlag}`)
             }.width('100%').padding({ bottom: 32 })
           }

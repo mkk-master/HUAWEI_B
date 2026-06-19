@@ -689,7 +689,8 @@ struct Index {
         // 饼图：分类筛选时展示全月数据，仅关键字搜索时才跟随筛选
         if (this.getPieData().length > 0) {
           PieChart({
-            data: this.getPieData()
+            data: this.getPieData(),
+            isTablet: this.isTablet
           })
             .key(`pie-tablet-${this.refreshFlag}`)
         }
@@ -791,7 +792,7 @@ struct Index {
       .alignItems(HorizontalAlign.Center)
     }
     .width('100%')
-    .height('100%')
+    .layoutWeight(1)
     .scrollBar(BarState.Auto)
     .padding({ left: 16, right: 16 })
   }
@@ -878,7 +879,7 @@ struct Index {
       .alignItems(HorizontalAlign.Center)
     }
     .width('100%')
-    .height('100%')
+    .layoutWeight(1)
     .scrollBar(BarState.Auto)
     .padding({ left: 16, right: 16 })
   }
