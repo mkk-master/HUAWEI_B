@@ -1,96 +1,76 @@
-// HapTest UI 自动化测试 — 智慧记账大作业
-// 测试策略: TextPresence + ComponentPresence
-// 框架: Hypium (HapTest 兼容层)
+// HapTest 补充测试：数据模型 + 分类引擎逻辑
+// 测试策略: TextPresence + ComponentPresence 扩展
 
-import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium';
+import { describe, beforeAll, afterAll, it, expect } from '@ohos/hypium';
+import { Driver, ON, Component } from '@ohos.UiTest';
+import { CurrencyUtil } from '../../../../main/ets/utils/CurrencyUtil';
+import { CategoryType } from '../../../../main/ets/model/BillModel';
 
 export default function smartAccountHapTest() {
-  describe('SmartAccount_HapTest', () => {
+  describe('SmartAccount_Extended', () => {
 
-    /**
-     * 测试策略 1: TextPresence
-     * 模拟验证应用关键页面中存在预期的文字内容
-     */
+    let driver: Driver | null = null;
 
-    it('TextPresence_首页关键文字存在', 0, () => {
-      // 预期首页显示的文字列表
-      const expectedTexts: string[] = [
-        '智慧记账',
-        '记一笔',
-        '消费统计',
-        '上月',
-        '下月',
-        '本月'
-      ];
-
-      // 在运行时环境中，HapTest Driver 会驱动 UI，这里用常量验证测试结构
-      expectedTexts.forEach((text: string) => {
-        expect(text).assertContain(text.substring(0, 1));
-      });
-      // 验证预期文本数量
-      expect(expectedTexts.length).assertEqual(6);
+    beforeAll(async () => {
+      driver = Driver.create();
+      await driver!.delayMs(2000);
     });
 
-    it('TextPresence_预算卡片关键文字存在', 0, () => {
-      const budgetTexts: string[] = ['剩余', '预算', '已花'];
-
-      budgetTexts.forEach((text: string) => {
-        expect(text.length).assertLarger(0);
-      });
-      expect(budgetTexts.length).assertEqual(3);
+    afterAll(async () => {
+      // 框架管理
     });
 
-    it('TextPresence_搜索和筛选组件文字存在', 0, () => {
-      const searchHint: string = '搜索备注关键字';
-      const defaultCategory: string = '全部类型';
-
-      expect(searchHint.length).assertLarger(0);
-      expect(defaultCategory.length).assertLarger(0);
+    // 策略1扩展：验证 AddBillPage 全字段
+    it('TextPresence_AddBillPage全字段存在', 0, async () => {
+      if (!driver) return;
+      const addBtn = await driver!.findComponent(ON.text('记一笔'));
+      await addBtn!.click();
+      await driver!.delayMs(1500);
+      await driver!.assertComponentExist(ON.text('金额'), 2000);
+      await driver!.assertComponentExist(ON.text('分类'), 2000);
+      await driver!.assertComponentExist(ON.text('日期'), 2000);
+      await driver!.assertComponentExist(ON.text('备注'), 2000);
+      await driver!.assertComponentExist(ON.text('保存'), 2000);
+      // 返回
+      const cancel = await driver!.findComponent(ON.text('取消'));
+      await cancel!.click();
+      await driver!.delayMs(1000);
     });
 
-    /**
-     * 测试策略 2: ComponentPresence
-     * 模拟验证应用关键页面中存在预期的 UI 组件
-     */
-
-    it('ComponentPresence_首页核心组件存在性验证', 0, () => {
-      // 模拟验证 Button, TextInput, Progress 等组件存在
-      const componentTypes: string[] = ['Button', 'TextInput', 'Progress', 'Select', 'List'];
-
-      componentTypes.forEach((type: string) => {
-        expect(type.length).assertLarger(0);
-      });
-      expect(componentTypes.length).assertEqual(5);
+    // 策略2扩展：分类 Grid 组件可用
+    it('ComponentPresence_分类Grid存在8个分类', 0, async () => {
+      if (!driver) return;
+      const addBtn = await driver!.findComponent(ON.text('记一笔'));
+      await addBtn!.click();
+      await driver!.delayMs(1500);
+      // 验证8个分类文字都存在
+      const cats: string[] = [('饮食'), ('交通'), ('购物'), ('娱乐'), ('居住'), ('医疗'), ('教育'), ('其他')];
+      for (let i = 0; i < cats.length; i++) {
+        await driver!.assertComponentExist(ON.text(cats[i]), 2000);
+      }
+      const cancel = await driver!.findComponent(ON.text('取消'));
+      await cancel!.click();
+      await driver!.delayMs(1000);
     });
 
-    it('ComponentPresence_账单数据模型字段完整性', 0, () => {
-      // 验证账单数据结构（模拟数据）
-      const billKeys: string[] = ['id', 'amount', 'category', 'date', 'remark'];
-      const mockBill: Record<string, Object> = {
-        id: 1,
-        amount: 1500,
-        category: '饮食',
-        date: '2026-06-19',
-        remark: '午餐'
-      };
-
-      billKeys.forEach((key: string) => {
-        expect(mockBill[key] !== undefined).assertTrue();
-      });
+    // 策略2扩展：验证金额输入校验逻辑（核心业务逻辑）
+    it('ComponentPresence_金额校验_合法值通过', 0, async () => {
+      expect(CurrencyUtil.isValidAmount('50.00')).assertTrue();
+      expect(CurrencyUtil.isValidAmount('0.01')).assertTrue();
+      expect(CurrencyUtil.isValidAmount('99999999.99')).assertTrue();
     });
 
+    it('ComponentPresence_金额校验_非法值拒绝', 0, async () => {
+      expect(CurrencyUtil.isValidAmount('')).assertFalse();
+      expect(CurrencyUtil.isValidAmount('-50')).assertFalse();
+      expect(CurrencyUtil.isValidAmount('abc')).assertFalse();
+      expect(CurrencyUtil.isValidAmount('50.999')).assertFalse();
+    });
+
+    // 策略2扩展：验证分类枚举完整性
     it('ComponentPresence_分类枚举完整性', 0, () => {
-      // 验证应用支持的所有分类
-      const categories: string[] = [
-        '饮食', '交通', '购物', '娱乐',
-        '居住', '医疗', '教育', '其他'
-      ];
-
-      expect(categories.length).assertEqual(8);
-      categories.forEach((cat: string) => {
-        expect(cat.length).assertLarger(0);
-      });
+      const values: string[] = Object.values(CategoryType);
+      expect(values.length).assertEqual(8);
     });
-
   });
 }
