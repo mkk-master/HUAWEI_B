@@ -3,6 +3,7 @@ import { BillViewModel } from '../viewmodel/BillViewModel';
 import { CurrencyUtil } from '../utils/CurrencyUtil';
 import { BillModel, CategoryType, CategoryColors } from '../model/BillModel';
 import { DatabaseHelper } from '../database/DatabaseHelper';
+import { PieChart } from '../components/PieChart';
 import router from '@ohos.router';
 import { window } from '@kit.ArkUI';
 
@@ -600,105 +601,121 @@ struct Index {
   // 平板模式下右侧的统计面板
   @Builder
   buildTabletStatsPanel() {
-    Column() {
-      Text('消费统计看板')
-        .fontSize(20)
-        .fontWeight(FontWeight.Bold)
-        .fontColor('#333333')
-        .margin({ top: 16, bottom: 12 })
-
-      Text(`${this.viewModel.currentMonth} 总消费`)
-        .fontSize(14)
-        .fontColor('#666666')
-
-      Text(`¥${CurrencyUtil.fenToYuan(this.viewModel.monthlyTotal)}`)
-        .fontSize(28)
-        .fontWeight(FontWeight.Bold)
-        .fontColor('#D32F2F')
-        .margin({ top: 4, bottom: 16 })
-
-      // 预算进度
+    Scroll() {
       Column() {
-        Row() {
-          Text(`${this.viewModel.currentMonth} 预算剩余`)
-            .fontSize(14)
-            .fontColor('#666666')
-          Text(`${CurrencyUtil.fenToYuan(this.viewModel.getRemainingBudget())} 元`)
-            .fontSize(22)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(this.viewModel.getRemainingBudget() >= 0 ? '#2E7D32' : '#D32F2F')
-            .margin({ left: 8 })
-        }
-        .width('100%')
-        .justifyContent(FlexAlign.SpaceBetween)
+        Text('消费统计看板')
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#333333')
+          .margin({ top: 16, bottom: 12 })
 
-        Progress({
-          value: this.viewModel.getBudgetProgress() * 100,
-          total: 100,
-          type: ProgressType.Linear
-        })
+        // 饼图
+        if (this.viewModel.getCategorySummary().length > 0) {
+          PieChart({
+            data: this.viewModel.getCategorySummary()
+          })
+            .key(`pie-tablet-${this.refreshFlag}`)
+        }
+
+        Text(`${this.viewModel.currentMonth} 总消费`)
+          .fontSize(14)
+          .fontColor('#666666')
+          .margin({ top: 16 })
+
+        Text(`¥${CurrencyUtil.fenToYuan(this.viewModel.monthlyTotal)}`)
+          .fontSize(28)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#D32F2F')
+          .margin({ top: 4, bottom: 16 })
+
+        // 预算进度
+        Column() {
+          Row() {
+            Text(`${this.viewModel.currentMonth} 预算剩余`)
+              .fontSize(14)
+              .fontColor('#666666')
+            Text(`${CurrencyUtil.fenToYuan(this.viewModel.getRemainingBudget())} 元`)
+              .fontSize(22)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.viewModel.getRemainingBudget() >= 0 ? '#2E7D32' : '#D32F2F')
+              .margin({ left: 8 })
+          }
           .width('100%')
-          .height(8)
-          .style({ strokeWidth: 8, strokeRadius: 4 })
-          .color(this.viewModel.getRemainingBudget() >= 0 ? '#4CAF50' : '#F44336')
-          .margin({ top: 8 })
+          .justifyContent(FlexAlign.SpaceBetween)
 
-        Row() {
-          Text(`预算 ¥${CurrencyUtil.fenToYuan(this.viewModel.monthlyBudget)}`)
-            .fontSize(12)
-            .fontColor('#999999')
-          Text(`已花 ¥${CurrencyUtil.fenToYuan(this.viewModel.monthlyTotal)}`)
-            .fontSize(12)
-            .fontColor('#999999')
+          Progress({
+            value: this.viewModel.getBudgetProgress() * 100,
+            total: 100,
+            type: ProgressType.Linear
+          })
+            .width('100%')
+            .height(8)
+            .style({ strokeWidth: 8, strokeRadius: 4 })
+            .color(this.viewModel.getRemainingBudget() >= 0 ? '#4CAF50' : '#F44336')
+            .margin({ top: 8 })
+
+          Row() {
+            Text(`预算 ¥${CurrencyUtil.fenToYuan(this.viewModel.monthlyBudget)}`)
+              .fontSize(12)
+              .fontColor('#999999')
+            Text(`已花 ¥${CurrencyUtil.fenToYuan(this.viewModel.monthlyTotal)}`)
+              .fontSize(12)
+              .fontColor('#999999')
+          }
+          .width('100%')
+          .justifyContent(FlexAlign.SpaceBetween)
+          .margin({ top: 4 })
         }
         .width('100%')
-        .justifyContent(FlexAlign.SpaceBetween)
-        .margin({ top: 4 })
-      }
-      .width('100%')
-      .padding(14)
-      .backgroundColor('#FFFFFF')
-      .borderRadius(12)
-      .shadow({ radius: 8, color: '#10000000', offsetX: 0, offsetY: 2 })
-      .margin({ bottom: 16 })
+        .padding(14)
+        .backgroundColor('#FFFFFF')
+        .borderRadius(12)
+        .shadow({ radius: 8, color: '#10000000', offsetX: 0, offsetY: 2 })
+        .margin({ bottom: 16 })
 
-      // 分类统计列表
-      if (this.viewModel.getCategorySummary().length > 0) {
-        List() {
+        // 分类统计列表
+        if (this.viewModel.getCategorySummary().length > 0) {
+          Text('分类明细')
+            .fontSize(15)
+            .fontWeight(FontWeight.Medium)
+            .alignSelf(ItemAlign.Start)
+            .margin({ bottom: 8 })
+
           ForEach(this.viewModel.getCategorySummary(), (item: CategorySummaryItem) => {
-            ListItem() {
-              Row() {
-                Circle({ width: 12, height: 12 })
-                  .fill(CategoryColors[item.category] || '#CCCCCC')
-                Text(item.category)
-                  .fontSize(15)
-                  .margin({ left: 8 })
-                  .layoutWeight(1)
-                Text(`¥${CurrencyUtil.fenToYuan(item.amount)}`)
-                  .fontSize(15)
-                  .fontWeight(FontWeight.Bold)
-                Text(this.viewModel.monthlyTotal > 0
-                  ? `${((item.amount / this.viewModel.monthlyTotal) * 100).toFixed(1)}%`
-                  : '0.0%')
-                  .fontSize(13)
-                  .fontColor('#999999')
-                  .margin({ left: 8 })
-              }
-              .width('100%')
-              .padding(10)
-              .backgroundColor('#FFFFFF')
-              .borderRadius(8)
-              .margin({ top: 4, bottom: 4 })
+            Row() {
+              Circle({ width: 12, height: 12 })
+                .fill(CategoryColors[item.category] || '#CCCCCC')
+              Text(item.category)
+                .fontSize(15)
+                .margin({ left: 8 })
+                .layoutWeight(1)
+              Text(`¥${CurrencyUtil.fenToYuan(item.amount)}`)
+                .fontSize(15)
+                .fontWeight(FontWeight.Bold)
+              Text(this.viewModel.monthlyTotal > 0
+                ? `${((item.amount / this.viewModel.monthlyTotal) * 100).toFixed(1)}%`
+                : '0.0%')
+                .fontSize(13)
+                .fontColor('#999999')
+                .margin({ left: 8 })
             }
+            .width('100%')
+            .padding(10)
+            .backgroundColor('#FFFFFF')
+            .borderRadius(8)
+            .margin({ top: 4, bottom: 4 })
           })
         }
-        .layoutWeight(1)
-        .width('100%')
+
+        Blank()
+          .height(32)
       }
+      .width('100%')
+      .alignItems(HorizontalAlign.Center)
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#F5F5F5')
-    .padding({ left: 16, right: 16, bottom: 16 })
+    .scrollBar(BarState.Auto)
+    .padding({ left: 16, right: 16 })
   }
 }
