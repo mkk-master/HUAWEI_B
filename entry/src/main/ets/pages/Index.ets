@@ -26,6 +26,9 @@ struct Index {
   @State refreshFlag: number = 0;
   @State isTablet: boolean = false;
   @StorageLink('currentBreakpoint') currentBreakpoint: string = 'sm';
+  @State rightPanelTab: number = 0; // 0=统计看板, 1=预算设置
+  @State budgetInput: string = '';
+  @State budgetInputError: string = '';
 
   private categoryOptions: SelectOption[] = this.createCategoryOptions();
   private dbHelper: DatabaseHelper = DatabaseHelper.getInstance();
@@ -152,8 +155,43 @@ struct Index {
         .height('100%')
         .backgroundColor('#FFFFFF')
 
-        // 右侧内容区：统计面板
-        this.buildTabletStatsPanel()
+        // 右侧内容区：Tab 切换 统计看板 / 预算设置
+        Column() {
+          // Tab 切换按钮
+          Row() {
+            Button('统计看板')
+              .fontSize(14)
+              .height(36)
+              .type(this.rightPanelTab === 0 ? ButtonType.Capsule : ButtonType.Normal)
+              .backgroundColor(this.rightPanelTab === 0 ? '#4CAF50' : '#F5F5F5')
+              .fontColor(this.rightPanelTab === 0 ? '#FFFFFF' : '#333333')
+              .onClick(() => { this.rightPanelTab = 0; })
+
+            Button('预算设置')
+              .fontSize(14)
+              .height(36)
+              .type(this.rightPanelTab === 1 ? ButtonType.Capsule : ButtonType.Normal)
+              .backgroundColor(this.rightPanelTab === 1 ? '#4CAF50' : '#F5F5F5')
+              .fontColor(this.rightPanelTab === 1 ? '#FFFFFF' : '#333333')
+              .margin({ left: 12 })
+              .onClick(() => {
+                this.rightPanelTab = 1;
+                this.loadBudgetForSidebar();
+              })
+          }
+          .width('100%')
+          .justifyContent(FlexAlign.Center)
+          .margin({ top: 16, bottom: 12 })
+
+          if (this.rightPanelTab === 0) {
+            this.buildTabletStatsPanel()
+          } else {
+            this.buildTabletBudgetPanel()
+          }
+        }
+        .width('100%')
+        .height('100%')
+        .backgroundColor('#F5F5F5')
       }
       .sideBarWidth(320)
       .showSideBar(true)
@@ -443,57 +481,26 @@ struct Index {
 
   @Builder
   buildActionButtons() {
-    Row() {
-      Button() {
-        Row() {
-          Text('+')
-            .fontSize(20)
-            .fontWeight(FontWeight.Bold)
-            .margin({ right: 4 })
+    Button() {
+      Row() {
+        Text('+')
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .margin({ right: 4 })
 
-          Text('记一笔')
-            .fontSize(16)
-        }
+        Text('记一笔')
+          .fontSize(16)
       }
-      .width('45%')
-      .height(48)
-      .backgroundColor('#4CAF50')
-      .borderRadius(24)
-      .onClick(async () => {
-        await router.pushUrl({
-          url: 'pages/AddBillPage'
-        });
-      })
-
-      Blank()
-
-      Button() {
-        Row() {
-          Text('📈')
-            .fontSize(16)
-            .margin({ right: 4 })
-
-          Text('消费统计')
-            .fontSize(16)
-        }
-      }
-      .width('45%')
-      .height(48)
-      .backgroundColor('#2196F3')
-      .borderRadius(24)
-      .onClick(async () => {
-        await router.pushUrl({
-          url: 'pages/StatisticsPage',
-          params: {
-            month: this.viewModel.currentMonth
-          }
-        });
-      })
     }
     .width('90%')
-    .margin({
-      top: 4,
-      bottom: 8
+    .height(48)
+    .backgroundColor('#4CAF50')
+    .borderRadius(24)
+    .margin({ top: 4, bottom: 8 })
+    .onClick(async () => {
+      await router.pushUrl({
+        url: 'pages/AddBillPage'
+      });
     })
   }
 
@@ -601,15 +608,10 @@ struct Index {
       }
       .width(36)
       .height(36)
-      .backgroundColor('#F0F0F0')
+      .backgroundColor(this.rightPanelTab === 0 ? '#C8E6C9' : '#F0F0F0')
       .borderRadius(18)
       .margin({ right: 6 })
-      .onClick(async () => {
-        await router.pushUrl({
-          url: 'pages/StatisticsPage',
-          params: { month: this.viewModel.currentMonth }
-        });
-      })
+      .onClick(() => { this.rightPanelTab = 0; })
 
       Button() {
         Text('💰')
@@ -617,14 +619,12 @@ struct Index {
       }
       .width(36)
       .height(36)
-      .backgroundColor('#F0F0F0')
+      .backgroundColor(this.rightPanelTab === 1 ? '#C8E6C9' : '#F0F0F0')
       .borderRadius(18)
       .margin({ right: 6 })
-      .onClick(async () => {
-        await router.pushUrl({
-          url: 'pages/BudgetPage',
-          params: { month: this.viewModel.currentMonth }
-        });
+      .onClick(() => {
+        this.rightPanelTab = 1;
+        this.loadBudgetForSidebar();
       })
 
       Button() {
@@ -782,5 +782,149 @@ struct Index {
     .height('100%')
     .scrollBar(BarState.Auto)
     .padding({ left: 16, right: 16 })
+  }
+
+  // 平板模式下右侧的预算设置面板
+  @Builder
+  buildTabletBudgetPanel() {
+    Scroll() {
+      Column() {
+        Text('预算设置')
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#333333')
+          .margin({ top: 4, bottom: 16 })
+
+        Text(`${this.viewModel.currentMonth} 月度预算`)
+          .fontSize(16)
+          .fontColor('#666666')
+          .margin({ bottom: 12 })
+
+        if (this.viewModel.monthlyBudget > 0) {
+          Text(`当前预算：${CurrencyUtil.fenToYuan(this.viewModel.monthlyBudget)} 元`)
+            .fontSize(14)
+            .fontColor('#999999')
+            .margin({ bottom: 16 })
+        } else {
+          Text('当前月份还没有设置预算')
+            .fontSize(14)
+            .fontColor('#999999')
+            .margin({ bottom: 16 })
+        }
+
+        TextInput({
+          placeholder: '请输入预算金额',
+          text: this.budgetInput
+        })
+          .fontSize(32)
+          .fontWeight(FontWeight.Bold)
+          .textAlign(TextAlign.Center)
+          .maxLength(12)
+          .backgroundColor('#F5F5F5')
+          .borderRadius(8)
+          .padding(12)
+          .width('100%')
+          .onChange((value: string) => {
+            this.budgetInput = value;
+            if (value.length > 0 && !CurrencyUtil.isValidAmount(value)) {
+              this.budgetInputError = '请输入有效金额（最多两位小数）';
+            } else {
+              this.budgetInputError = '';
+            }
+          })
+
+        if (this.budgetInputError) {
+          Text(this.budgetInputError)
+            .fontSize(14)
+            .fontColor('#F44336')
+            .margin({ top: 8 })
+        }
+
+        Row() {
+          this.buildQuickBudgetButton('1000')
+          this.buildQuickBudgetButton('2000')
+          this.buildQuickBudgetButton('5000')
+        }
+        .width('100%')
+        .justifyContent(FlexAlign.SpaceAround)
+        .margin({ top: 24 })
+
+        Button('保存预算')
+          .width('70%')
+          .height(48)
+          .fontSize(16)
+          .backgroundColor('#4CAF50')
+          .borderRadius(24)
+          .margin({ top: 32 })
+          .enabled(!this.budgetInputError && this.budgetInput.length > 0)
+          .opacity(this.budgetInputError || this.budgetInput.length === 0 ? 0.5 : 1)
+          .onClick(() => { this.saveBudgetFromSidebar(); })
+
+        Blank().height(32)
+      }
+      .width('100%')
+      .alignItems(HorizontalAlign.Center)
+    }
+    .width('100%')
+    .height('100%')
+    .scrollBar(BarState.Auto)
+    .padding({ left: 16, right: 16 })
+  }
+
+  @Builder
+  buildQuickBudgetButton(amount: string) {
+    Button(`${amount}元`)
+      .fontSize(14)
+      .backgroundColor('#E3F2FD')
+      .fontColor('#1976D2')
+      .borderRadius(8)
+      .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+      .onClick(() => {
+        this.budgetInput = amount;
+        this.budgetInputError = '';
+      })
+  }
+
+  private async loadBudgetForSidebar(): Promise<void> {
+    const budgetFen = this.viewModel.monthlyBudget;
+    if (budgetFen > 0) {
+      this.budgetInput = (budgetFen / 100).toFixed(2);
+    } else {
+      this.budgetInput = '';
+    }
+    this.budgetInputError = '';
+  }
+
+  private async saveBudgetFromSidebar(): Promise<void> {
+    if (!this.budgetInput || this.budgetInput.trim().length === 0) {
+      this.budgetInputError = '请输入预算金额';
+      return;
+    }
+    if (!CurrencyUtil.isValidAmount(this.budgetInput)) {
+      this.budgetInputError = '请输入有效金额（最多两位小数）';
+      return;
+    }
+
+    try {
+      const success = await this.viewModel.setBudgetForMonth(
+        this.viewModel.currentMonth,
+        this.budgetInput.trim()
+      );
+      if (success) {
+        await this.viewModel.loadBudget();
+        this.refreshFlag++;
+        AlertDialog.show({
+          title: '保存成功',
+          message: `${this.viewModel.currentMonth} 的预算已更新`,
+          confirm: { value: '确定', action: () => {} },
+          cancel: () => {}
+        });
+      } else {
+        this.budgetInputError = '保存失败，请重试';
+      }
+    } catch (error) {
+      console.error('Error saving budget:', error);
+      this.budgetInputError = '保存失败，请重试';
+    }
   }
 }

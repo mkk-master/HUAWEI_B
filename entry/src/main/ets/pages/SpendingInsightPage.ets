@@ -9,6 +9,7 @@ import { DashScopeChatMessage } from '../utils/DashScopeOpenAiClient';
 import promptAction from '@ohos.promptAction';
 import router from '@ohos.router';
 import dataPreferences from '@ohos.data.preferences';
+import { window } from '@kit.ArkUI';
 
 interface InsightChatTurn {
   question: string;
@@ -29,6 +30,8 @@ struct SpendingInsightPage {
   @State loadingReport: boolean = false;
   @State loadingChat: boolean = false;
   @State hintText: string = '';
+  @State isTablet: boolean = false;
+  @StorageLink('currentBreakpoint') currentBreakpoint: string = 'sm';
 
   private viewModel: BillViewModel = new BillViewModel();
   private dbHelper: DatabaseHelper = DatabaseHelper.getInstance();
@@ -51,6 +54,7 @@ struct SpendingInsightPage {
     await this.viewModel.changeMonth(this.monthStr, '', '');
     await this.viewModel.loadBudget();
     await this.loadCloudApiKeyFromPreferences();
+    await this.detectTabletMode();
     await this.refreshDataPayload();
     //await this.onGenerateReport();
   }
@@ -70,6 +74,24 @@ struct SpendingInsightPage {
       }
     } catch (e) {
       console.error('读取云端 AI Key 失败', e);
+    }
+  }
+
+  private async detectTabletMode(): Promise<void> {
+    if (this.currentBreakpoint === 'md' || this.currentBreakpoint === 'lg' || this.currentBreakpoint === 'xl') {
+      this.isTablet = true;
+      return;
+    }
+    try {
+      const win = await window.getLastWindow(getContext(this));
+      const props = win.getWindowProperties();
+      const rect = props.windowRect;
+      const widthVp: number = px2vp(rect.width) as number;
+      if (widthVp >= 600) {
+        this.isTablet = true;
+      }
+    } catch (e) {
+      // 不可用时保持默认值 false
     }
   }
 
@@ -134,13 +156,12 @@ struct SpendingInsightPage {
 
   build() {
     Column() {
+      // 顶部标题栏
       Row() {
         Button('返回')
           .backgroundColor('#00000000')
           .fontColor('#4CAF50')
-          .onClick(() => {
-            router.back();
-          })
+          .onClick(() => { router.back(); })
 
         Text('AI 消费洞察')
           .fontSize(18)
@@ -151,131 +172,258 @@ struct SpendingInsightPage {
         Blank()
           .width(56)
       }
-      .width('90%')
+      .width(this.isTablet ? '95%' : '90%')
       .height(48)
 
-      Scroll() {
-        Column() {
-          Text(`分析月份：${this.monthStr}`)
-            .fontSize(16)
-            .fontWeight(FontWeight.Medium)
-            .alignSelf(ItemAlign.Start)
-            .margin({ bottom: 8 })
+      Text(`分析月份：${this.monthStr}`)
+        .fontSize(16)
+        .fontWeight(FontWeight.Medium)
+        .alignSelf(ItemAlign.Start)
+        .margin({ bottom: 8 })
+        .padding({ left: this.isTablet ? 16 : 0 })
 
-
-          if (this.hintText.length > 0) {
-            Text(this.hintText)
-              .fontSize(12)
-              .fontColor('#FF9800')
-              .alignSelf(ItemAlign.Start)
-              .margin({ bottom: 8 })
-          }
-
-          Button(this.loadingReport ? '生成中…' : '生成消费分析报告')
-            .width('100%')
-            .height(44)
-            .backgroundColor('#4CAF50')
-            .enabled(!this.loadingReport && !this.loadingChat)
-            .onClick(() => {
-              void this.onGenerateReport();
-            })
-
-          Text('数据摘要（发给模型的依据）')
-            .fontSize(13)
-            .fontColor('#666666')
-            .alignSelf(ItemAlign.Start)
-            .margin({ top: 16, bottom: 6 })
-
-          Text(this.dataPayload.length > 0 ? this.dataPayload : '暂无数据')
-            .fontSize(12)
-            .fontColor('#333333')
-            .width('100%')
-            .padding(12)
-            .backgroundColor('#F5F5F5')
-            .borderRadius(8)
-
-          Text('分析报告')
-            .fontSize(15)
-            .fontWeight(FontWeight.Medium)
-            .alignSelf(ItemAlign.Start)
-            .margin({ top: 20, bottom: 8 })
-
-          Text(this.reportText.length > 0 ? this.reportText : '点击上方按钮生成报告（含消费结构、预算执行、超支原因与节流建议）')
-            .fontSize(14)
-            .fontColor('#333333')
-            .width('100%')
-            .lineHeight(22)
-            .padding(12)
-            .backgroundColor('#FAFAFA')
-            .borderRadius(8)
-
-          Text('自然语言追问')
-            .fontSize(15)
-            .fontWeight(FontWeight.Medium)
-            .alignSelf(ItemAlign.Start)
-            .margin({ top: 24, bottom: 8 })
-
-          Text('基于上方数据与报告继续提问，例如：「餐饮能不能再省一点」「大额支出主要在哪」')
-            .fontSize(12)
-            .fontColor('#999999')
-            .alignSelf(ItemAlign.Start)
-            .margin({ bottom: 8 })
-
-          ForEach(this.chatTurns, (turn: InsightChatTurn, index: number) => {
+      if (this.isTablet) {
+        // ===== 平板模式：双栏布局 =====
+        Row() {
+          // 左侧：数据摘要 + 分析报告
+          Scroll() {
             Column() {
-              Text(`Q${index + 1}：${turn.question}`)
-                .fontSize(13)
-                .fontColor('#1976D2')
-                .width('100%')
-                .margin({ bottom: 6 })
+              if (this.hintText.length > 0) {
+                Text(this.hintText)
+                  .fontSize(12)
+                  .fontColor('#FF9800')
+                  .margin({ bottom: 8 })
+              }
 
-              Text(turn.answer)
+              Button(this.loadingReport ? '生成中…' : '生成消费分析报告')
+                .width('100%')
+                .height(44)
+                .backgroundColor('#4CAF50')
+                .enabled(!this.loadingReport && !this.loadingChat)
+                .onClick(() => { void this.onGenerateReport(); })
+
+              Text('数据摘要（发给模型的依据）')
+                .fontSize(13)
+                .fontColor('#666666')
+                .alignSelf(ItemAlign.Start)
+                .margin({ top: 16, bottom: 6 })
+
+              Text(this.dataPayload.length > 0 ? this.dataPayload : '暂无数据')
+                .fontSize(12)
+                .fontColor('#333333')
+                .width('100%')
+                .padding(12)
+                .backgroundColor('#F5F5F5')
+                .borderRadius(8)
+
+              Text('分析报告')
+                .fontSize(15)
+                .fontWeight(FontWeight.Medium)
+                .alignSelf(ItemAlign.Start)
+                .margin({ top: 20, bottom: 8 })
+
+              Text(this.reportText.length > 0 ? this.reportText : '点击上方按钮生成报告')
                 .fontSize(14)
                 .fontColor('#333333')
                 .width('100%')
                 .lineHeight(22)
+                .padding(12)
+                .backgroundColor('#FAFAFA')
+                .borderRadius(8)
+
+              Blank().height(24)
             }
             .width('100%')
-            .padding(12)
-            .backgroundColor('#FFFFFF')
-            .borderRadius(8)
-            .margin({ bottom: 10 })
-          }, (turn: InsightChatTurn, index: number) => `${index}-${turn.question}`)
+            .alignItems(HorizontalAlign.Start)
+          }
+          .layoutWeight(1)
+          .height('100%')
+          .scrollBar(BarState.Auto)
+          .padding({ left: 16, right: 12 })
 
-          Row() {
-            TextInput({
-              placeholder: '输入你的问题…',
-              text: this.questionInput
-            })
-              .layoutWeight(1)
+          // 右侧：自然语言追问
+          Column() {
+            Text('自然语言追问')
+              .fontSize(15)
+              .fontWeight(FontWeight.Medium)
+              .alignSelf(ItemAlign.Start)
+              .margin({ bottom: 8 })
+
+            Text('基于数据与报告继续提问')
+              .fontSize(12)
+              .fontColor('#999999')
+              .alignSelf(ItemAlign.Start)
+              .margin({ bottom: 8 })
+
+            Scroll() {
+              Column() {
+                ForEach(this.chatTurns, (turn: InsightChatTurn, index: number) => {
+                  Column() {
+                    Text(`Q${index + 1}：${turn.question}`)
+                      .fontSize(13)
+                      .fontColor('#1976D2')
+                      .width('100%')
+                      .margin({ bottom: 6 })
+                    Text(turn.answer)
+                      .fontSize(14)
+                      .fontColor('#333333')
+                      .width('100%')
+                      .lineHeight(22)
+                  }
+                  .width('100%')
+                  .padding(12)
+                  .backgroundColor('#FFFFFF')
+                  .borderRadius(8)
+                  .margin({ bottom: 10 })
+                }, (turn: InsightChatTurn, index: number) => `${index}-${turn.question}`)
+              }
+              .width('100%')
+            }
+            .layoutWeight(1)
+            .width('100%')
+            .scrollBar(BarState.Auto)
+
+            Row() {
+              TextInput({
+                placeholder: '输入你的问题…',
+                text: this.questionInput
+              })
+                .layoutWeight(1)
+                .height(44)
+                .fontSize(14)
+                .backgroundColor('#F5F5F5')
+                .borderRadius(8)
+                .padding({ left: 12, right: 12 })
+                .onChange((v: string) => { this.questionInput = v; })
+
+              Button(this.loadingChat ? '…' : '发送')
+                .width(72)
+                .height(44)
+                .margin({ left: 8 })
+                .backgroundColor('#2196F3')
+                .enabled(!this.loadingChat && !this.loadingReport)
+                .onClick(() => { void this.onSendQuestion(); })
+            }
+            .width('100%')
+            .margin({ top: 8 })
+          }
+          .layoutWeight(1)
+          .height('100%')
+          .padding({ left: 12, right: 16 })
+        }
+        .layoutWeight(1)
+        .width('100%')
+      } else {
+        // ===== 手机模式：保持原有单列布局 =====
+        Scroll() {
+          Column() {
+            if (this.hintText.length > 0) {
+              Text(this.hintText)
+                .fontSize(12)
+                .fontColor('#FF9800')
+                .alignSelf(ItemAlign.Start)
+                .margin({ bottom: 8 })
+            }
+
+            Button(this.loadingReport ? '生成中…' : '生成消费分析报告')
+              .width('100%')
               .height(44)
-              .fontSize(14)
+              .backgroundColor('#4CAF50')
+              .enabled(!this.loadingReport && !this.loadingChat)
+              .onClick(() => { void this.onGenerateReport(); })
+
+            Text('数据摘要（发给模型的依据）')
+              .fontSize(13)
+              .fontColor('#666666')
+              .alignSelf(ItemAlign.Start)
+              .margin({ top: 16, bottom: 6 })
+
+            Text(this.dataPayload.length > 0 ? this.dataPayload : '暂无数据')
+              .fontSize(12)
+              .fontColor('#333333')
+              .width('100%')
+              .padding(12)
               .backgroundColor('#F5F5F5')
               .borderRadius(8)
-              .padding({ left: 12, right: 12 })
-              .onChange((v: string) => {
-                this.questionInput = v;
-              })
 
-            Button(this.loadingChat ? '…' : '发送')
-              .width(72)
-              .height(44)
-              .margin({ left: 8 })
-              .backgroundColor('#2196F3')
-              .enabled(!this.loadingChat && !this.loadingReport)
-              .onClick(() => {
-                void this.onSendQuestion();
+            Text('分析报告')
+              .fontSize(15)
+              .fontWeight(FontWeight.Medium)
+              .alignSelf(ItemAlign.Start)
+              .margin({ top: 20, bottom: 8 })
+
+            Text(this.reportText.length > 0 ? this.reportText : '点击上方按钮生成报告（含消费结构、预算执行、超支原因与节流建议）')
+              .fontSize(14)
+              .fontColor('#333333')
+              .width('100%')
+              .lineHeight(22)
+              .padding(12)
+              .backgroundColor('#FAFAFA')
+              .borderRadius(8)
+
+            Text('自然语言追问')
+              .fontSize(15)
+              .fontWeight(FontWeight.Medium)
+              .alignSelf(ItemAlign.Start)
+              .margin({ top: 24, bottom: 8 })
+
+            Text('基于上方数据与报告继续提问，例如：「餐饮能不能再省一点」「大额支出主要在哪」')
+              .fontSize(12)
+              .fontColor('#999999')
+              .alignSelf(ItemAlign.Start)
+              .margin({ bottom: 8 })
+
+            ForEach(this.chatTurns, (turn: InsightChatTurn, index: number) => {
+              Column() {
+                Text(`Q${index + 1}：${turn.question}`)
+                  .fontSize(13)
+                  .fontColor('#1976D2')
+                  .width('100%')
+                  .margin({ bottom: 6 })
+                Text(turn.answer)
+                  .fontSize(14)
+                  .fontColor('#333333')
+                  .width('100%')
+                  .lineHeight(22)
+              }
+              .width('100%')
+              .padding(12)
+              .backgroundColor('#FFFFFF')
+              .borderRadius(8)
+              .margin({ bottom: 10 })
+            }, (turn: InsightChatTurn, index: number) => `${index}-${turn.question}`)
+
+            Row() {
+              TextInput({
+                placeholder: '输入你的问题…',
+                text: this.questionInput
               })
+                .layoutWeight(1)
+                .height(44)
+                .fontSize(14)
+                .backgroundColor('#F5F5F5')
+                .borderRadius(8)
+                .padding({ left: 12, right: 12 })
+                .onChange((v: string) => { this.questionInput = v; })
+
+              Button(this.loadingChat ? '…' : '发送')
+                .width(72)
+                .height(44)
+                .margin({ left: 8 })
+                .backgroundColor('#2196F3')
+                .enabled(!this.loadingChat && !this.loadingReport)
+                .onClick(() => { void this.onSendQuestion(); })
+            }
+            .width('100%')
+            .margin({ top: 8, bottom: 32 })
           }
-          .width('100%')
-          .margin({ top: 8, bottom: 32 })
+          .width('90%')
+          .alignItems(HorizontalAlign.Center)
         }
-        .width('90%')
-        .alignItems(HorizontalAlign.Center)
+        .layoutWeight(1)
+        .width('100%')
+        .scrollBar(BarState.Auto)
       }
-      .layoutWeight(1)
-      .width('100%')
-      .scrollBar(BarState.Auto)
     }
     .width('100%')
     .height('100%')

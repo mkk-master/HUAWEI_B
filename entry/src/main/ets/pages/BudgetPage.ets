@@ -3,6 +3,7 @@ import { BillViewModel } from '../viewmodel/BillViewModel';
 import { CurrencyUtil } from '../utils/CurrencyUtil';
 import { DatabaseHelper } from '../database/DatabaseHelper';
 import router from '@ohos.router';
+import { window } from '@kit.ArkUI';
 
 @Entry
 @Component
@@ -13,6 +14,8 @@ struct BudgetPage {
   @State Budget_Tip: string = '';
   @State selectedMonth: string = this.formatMonth(new Date());
   @State refreshFlag: number = 0;
+  @State isTablet: boolean = false;
+  @StorageLink('currentBreakpoint') currentBreakpoint: string = 'sm';
 
   private viewModel: BillViewModel = new BillViewModel();
   private dbHelper: DatabaseHelper = DatabaseHelper.getInstance();
@@ -40,6 +43,24 @@ struct BudgetPage {
     return new Date(year, monthIndex, 1);
   }
 
+  private async detectTabletMode(): Promise<void> {
+    if (this.currentBreakpoint === 'md' || this.currentBreakpoint === 'lg' || this.currentBreakpoint === 'xl') {
+      this.isTablet = true;
+      return;
+    }
+    try {
+      const win = await window.getLastWindow(getContext(this));
+      const props = win.getWindowProperties();
+      const rect = props.windowRect;
+      const widthVp: number = px2vp(rect.width) as number;
+      if (widthVp >= 600) {
+        this.isTablet = true;
+      }
+    } catch (e) {
+      // 不可用时保持默认值 false
+    }
+  }
+
   private fenToPlainYuan(fen: number): string {
     return (fen / 100).toFixed(2);
   }
@@ -47,6 +68,7 @@ struct BudgetPage {
   async aboutToAppear(): Promise<void> {
     await this.dbHelper.initDatabase(getContext(this));
     await this.viewModel.init();
+    await this.detectTabletMode();
 
     this.selectedMonth = this.viewModel.currentMonth;
 
@@ -102,13 +124,12 @@ struct BudgetPage {
 
   build() {
     Column() {
+      // 顶部标题栏
       Row() {
         Button('返回')
           .backgroundColor('#00000000')
           .fontColor('#4CAF50')
-          .onClick(() => {
-            router.back();
-          })
+          .onClick(() => { router.back(); })
 
         Text('设置预算')
           .fontSize(18)
@@ -119,57 +140,13 @@ struct BudgetPage {
         Blank()
           .width(56)
       }
-      .width('90%')
+      .width(this.isTablet ? '95%' : '90%')
       .height(48)
 
-      Row() {
-        Button('上月')
-          .fontSize(13)
-          .height(36)
-          .backgroundColor('#F5F5F5')
-          .fontColor('#333333')
-          .borderRadius(18)
-          .onClick(async () => {
-            await this.goPreviousMonth();
-          })
+      // 月份选择器
+      this.buildBudgetMonthSelector()
 
-        Blank()
-
-        Text(this.selectedMonth)
-          .fontSize(20)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#333333')
-
-        Blank()
-
-        Button('下月')
-          .fontSize(13)
-          .height(36)
-          .backgroundColor('#F5F5F5')
-          .fontColor('#333333')
-          .borderRadius(18)
-          .onClick(async () => {
-            await this.goNextMonth();
-          })
-
-        Button('本月')
-          .fontSize(13)
-          .height(36)
-          .backgroundColor('#4CAF50')
-          .fontColor('#FFFFFF')
-          .borderRadius(18)
-          .margin({ left: 8 })
-          .onClick(async () => {
-            await this.goCurrentMonth();
-          })
-      }
-      .width('90%')
-      .height(44)
-      .margin({
-        top: 12,
-        bottom: 16
-      })
-
+      // 预算表单内容
       Column() {
         Text(`${this.selectedMonth} 月度预算`)
           .fontSize(16)
@@ -192,7 +169,7 @@ struct BudgetPage {
           placeholder: '请输入预算金额',
           text: this.budgetInput
         })
-          .fontSize(36)
+          .fontSize(this.isTablet ? 48 : 36)
           .fontWeight(FontWeight.Bold)
           .textAlign(TextAlign.Center)
           .maxLength(12)
@@ -201,7 +178,6 @@ struct BudgetPage {
           .padding(12)
           .onChange((value: string) => {
             this.budgetInput = value;
-
             if (value.length > 0 && !CurrencyUtil.isValidAmount(value)) {
               this.inputError = '请输入有效金额（最多两位小数）';
             } else {
@@ -226,7 +202,7 @@ struct BudgetPage {
         .margin({ top: 24 })
 
         Button(`保存 ${this.selectedMonth} 预算`)
-          .width('70%')
+          .width(this.isTablet ? '50%' : '70%')
           .height(48)
           .fontSize(16)
           .backgroundColor('#4CAF50')
@@ -234,16 +210,56 @@ struct BudgetPage {
           .margin({ top: 32 })
           .enabled(!this.inputError && this.budgetInput.length > 0)
           .opacity(this.inputError || this.budgetInput.length === 0 ? 0.5 : 1)
-          .onClick(() => {
-            this.saveBudget();
-          })
+          .onClick(() => { this.saveBudget(); })
       }
-      .width('80%')
-      .margin({ top: 20 })
+      .width(this.isTablet ? '50%' : '80%')
+      .margin({ top: this.isTablet ? 40 : 20 })
     }
     .width('100%')
     .height('100%')
     .backgroundColor('#FFFFFF')
+  }
+
+  @Builder
+  buildBudgetMonthSelector() {
+    Row() {
+      Button('上月')
+        .fontSize(13)
+        .height(36)
+        .backgroundColor('#F5F5F5')
+        .fontColor('#333333')
+        .borderRadius(18)
+        .onClick(async () => { await this.goPreviousMonth(); })
+
+      Blank()
+
+      Text(this.selectedMonth)
+        .fontSize(20)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#333333')
+
+      Blank()
+
+      Button('下月')
+        .fontSize(13)
+        .height(36)
+        .backgroundColor('#F5F5F5')
+        .fontColor('#333333')
+        .borderRadius(18)
+        .onClick(async () => { await this.goNextMonth(); })
+
+      Button('本月')
+        .fontSize(13)
+        .height(36)
+        .backgroundColor('#4CAF50')
+        .fontColor('#FFFFFF')
+        .borderRadius(18)
+        .margin({ left: 8 })
+        .onClick(async () => { await this.goCurrentMonth(); })
+    }
+    .width(this.isTablet ? '60%' : '90%')
+    .height(44)
+    .margin({ top: 12, bottom: 16 })
   }
 
   @Builder

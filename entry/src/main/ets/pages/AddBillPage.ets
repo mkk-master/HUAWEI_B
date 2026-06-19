@@ -10,6 +10,7 @@ import promptAction from '@ohos.promptAction';
 import router from '@ohos.router';
 import dataPreferences from '@ohos.data.preferences';
 import { FastTextInference } from '../utils/FastTextInference';
+import { window } from '@kit.ArkUI';
 const PREFERENCES_NAME: string = 'count1_prefs';
 const PREF_KEY_DASHSCOPE_API: string = 'dashscope_api_key';
 
@@ -34,6 +35,8 @@ struct AddBillPage {
   @State suggestedCategory: string = '';
   @State isPredicting: boolean = false;
   @State cloudApiKeyInput: string = 'sk-c32c4224bd084aa0baa79a0083200fcd';
+  @State isTablet: boolean = false;
+  @StorageLink('currentBreakpoint') currentBreakpoint: string = 'sm';
 
   private viewModel: BillViewModel = new BillViewModel();
   private categoryArray: CategoryType[] = Object.values(CategoryType);
@@ -67,10 +70,29 @@ struct AddBillPage {
     return new Date(year, month - 1, day);
   }
 
+  private async detectTabletMode(): Promise<void> {
+    if (this.currentBreakpoint === 'md' || this.currentBreakpoint === 'lg' || this.currentBreakpoint === 'xl') {
+      this.isTablet = true;
+      return;
+    }
+    try {
+      const win = await window.getLastWindow(getContext(this));
+      const props = win.getWindowProperties();
+      const rect = props.windowRect;
+      const widthVp: number = px2vp(rect.width) as number;
+      if (widthVp >= 600) {
+        this.isTablet = true;
+      }
+    } catch (e) {
+      // 不可用时保持默认值 false
+    }
+  }
+
   async aboutToAppear(): Promise<void> {
     await this.dbHelper.initDatabase(getContext(this));
     await this.viewModel.init();
     await this.loadCloudApiKeyFromPreferences();
+    await this.detectTabletMode();
     // 重置 TextInput 初始化标记（每次进入页面都重置）
     this.remarkInitialized = false;
     const fastText: FastTextInference = new FastTextInference();
@@ -180,240 +202,176 @@ struct AddBillPage {
   }
 
   build() {
-    Scroll() {
+    if (this.isTablet) {
+      // ===== 平板模式：居中卡片布局 =====
       Column() {
-        // 标题栏
         Row() {
-          Button('取消')
-            .backgroundColor('#00000000')
-            .fontColor('#666666')
-            .onClick(() => {
-              router.back();
-            })
-
-          Text(this.pageTitle)
-            .fontSize(18)
-            .fontWeight(FontWeight.Bold)
-            .layoutWeight(1)
-            .textAlign(TextAlign.Center)
-
-          Button('保存')
-            .backgroundColor('#4CAF50')
-            .borderRadius(8)
-            .fontColor('#FFFFFF')
-            .onClick(() => {
-              this.saveBill();
-            })
+          Button('取消').backgroundColor('#00000000').fontColor('#666666')
+            .onClick(() => { router.back(); })
+          Text(this.pageTitle).fontSize(22).fontWeight(FontWeight.Bold)
+            .layoutWeight(1).textAlign(TextAlign.Center)
+          Button('保存').backgroundColor('#4CAF50').borderRadius(8).fontColor('#FFFFFF')
+            .onClick(() => { this.saveBill(); })
         }
-        .width('90%')
-        .height(48)
-        .margin({ top: 8 })
+        .width('100%').height(56).padding({ left: 24, right: 24 }).margin({ top: 8 })
 
-        // 金额输入
-        Column() {
-          Text('金额')
-            .fontSize(14)
-            .fontColor('#666666')
-            .alignSelf(ItemAlign.Start)
-
-          TextInput({
-            placeholder: '0.00',
-            text: this.amountInput
-          })
-            //.type(InputType.Number)
-            .fontSize(32)
-            .fontWeight(FontWeight.Bold)
-            .height(60)
-            .border({
-              width: {
-                bottom: this.amountError ? 2 : 1
-              },
-              color: this.amountError ? '#F44336' : '#E0E0E0'
-            })
-            .onChange((value: string) => {
-              this.amountInput = value;
-              this.onAmountChange(value);
-              if (!value || value.trim().length === 0) {
-                this.amountError = '';
-                return;
-              }
-
-              if (!CurrencyUtil.isValidAmount(value)) {
-                this.amountError = '请输入有效金额（最多两位小数）';
-              } else {
-                this.amountError = '';
-              }
-            })
-
-          if (this.amountError) {
-            Text(this.amountError)
-              .fontSize(12)
-              .fontColor('#F44336')
-              .margin({ top: 4 })
-          }
-        }
-        .width('90%')
-        .margin({ top: 24 })
-
-        // 分类选择
-        Column() {
-          Text('分类')
-            .fontSize(14)
-            .fontColor('#666666')
-            .alignSelf(ItemAlign.Start)
-            .margin({ bottom: 8 })
-
-          Grid() {
-            ForEach(this.categoryArray, (category: CategoryType) => {
-              GridItem() {
-                Text(category)
-                  .fontSize(14)
-                  .padding({
-                    left: 12,
-                    right: 12,
-                    top: 6,
-                    bottom: 6
-                  })
-                  .borderRadius(16)
-                  .backgroundColor(this.selectedCategory === category ? '#4CAF50' : '#F5F5F5')
-                  .fontColor(this.selectedCategory === category ? '#FFFFFF' : '#333333')
-              }
-              .onClick(() => {
-                this.selectedCategory = category;
-              })
-            })
-          }
-          .columnsTemplate('1fr 1fr 1fr 1fr')
-          .rowsGap(8)
-          .columnsGap(8)
-          .width('100%')
-        }
-        .width('90%')
-        .margin({ top: 24 })
-
-        // 日期选择
-        Column() {
-          Text('日期')
-            .fontSize(14)
-            .fontColor('#666666')
-            .alignSelf(ItemAlign.Start)
-            .margin({ bottom: 8 })
-
-          DatePicker({
-            start: new Date('2000-01-01'),
-            end: new Date('2100-12-31'),
-            selected: this.parseDate(this.date)
-          })
-            .onChange((value: DatePickerResult) => {
-              this.date = `${value.year}-${String(value.month + 1).padStart(2, '0')}-${String(value.day).padStart(2, '0')}`;
-            })
-
-          Text(`当前选择日期：${this.date}`)
-            .fontSize(12)
-            .fontColor('#999999')
-            .margin({ top: 4 })
-        }
-        .width('90%')
-        .margin({ top: 24 })
-
-        // 备注输入
-        Column() {
-          Text('备注')
-            .fontSize(14)
-            .fontColor('#666666')
-            .alignSelf(ItemAlign.Start)
-            .margin({ bottom: 8 })
-
-          TextInput({
-            placeholder: '添加备注（可选）',
-            text: this.remarkInput
-          })
-            .maxLength(50)
-            .fontSize(14)
-            .height(44)
-            .backgroundColor('#F5F5F5')
-            .borderRadius(8)
-            .padding({
-              left: 12,
-              right: 12
-            })
-            .onChange((value: string) => {
-              // 忽略 TextInput 初始化时框架触发的空 onChange
-              if (!this.remarkInitialized) {
-                this.remarkInitialized = true;
-                return;
-              }
-              this.remarkInput = value;
-              this.onRemarkChange(value);
-            })
-          if (this.suggestedCategory) {
+        Scroll() {
+          Column() {
+            this.buildAmountInput()
             Row() {
-              Text('推荐分类：')
-                .fontSize(14)
-              Text(this.suggestedCategory)
-                .fontSize(14)
-                .fontColor('#007DFF')
-                .fontWeight(FontWeight.Bold)
+              Column() { this.buildCategoryLabel(); this.buildCategoryGrid() }
+                .layoutWeight(1).margin({ right: 12 })
+              Column() { this.buildDateLabel(); this.buildDatePicker() }
+                .layoutWeight(1).margin({ left: 12 })
             }
-            .margin({ top: 8 })
+            .width('100%').margin({ top: 24 })
+            this.buildRemarkInput()
+
+            if (this.suggestedCategory) {
+              Row() {
+                Text('推荐分类：').fontSize(16)
+                Text(this.suggestedCategory).fontSize(16).fontColor('#007DFF').fontWeight(FontWeight.Bold)
+              }.margin({ top: 16 })
+            }
+            if (this.isEdit) {
+              Button('删除账单').width('60%').height(48).fontSize(16)
+                .backgroundColor('#F44336').borderRadius(24).margin({ top: 32 })
+                .onClick(async () => {
+                  if (this.editBillId < 0) { this.amountError = '账单编号错误，无法删除'; return; }
+                  await this.viewModel.deleteBill(this.editBillId);
+                  router.back();
+                })
+            }
+            Blank().height(40)
           }
-
-         /* Text('DashScope API Key（可选，优先云端分类；仅保存在本机）')
-            .fontSize(12)
-            .fontColor('#999999')
-            .alignSelf(ItemAlign.Start)
-            .margin({ top: 16 })
-
-          TextInput({
-            placeholder: 'sk-…',
-            text: this.cloudApiKeyInput
-          })
-            .fontSize(12)
-            .height(40)
-            .backgroundColor('#F5F5F5')
-            .borderRadius(8)
-            .padding({ left: 12, right: 12 })
-            .onChange((value: string) => {
-              this.cloudApiKeyInput = value;
-              CloudAiConfig.apiKey = value.trim();
-            })
-            .onBlur(() => {
-              void this.persistCloudApiKey(this.cloudApiKeyInput);
-            })*/
+          .width('100%').alignItems(HorizontalAlign.Center)
         }
-        .width('90%')
-        .margin({ top: 24 })
-
-
-
-        if (this.isEdit) {
-          Button('删除账单')
-            .width('60%')
-            .height(48)
-            .fontSize(16)
-            .backgroundColor('#F44336')
-            .borderRadius(24)
-            .margin({ top: 32 })
-            .onClick(async () => {
-              if (this.editBillId < 0) {
-                this.amountError = '账单编号错误，无法删除';
-                return;
-              }
-
-              await this.viewModel.deleteBill(this.editBillId);
-              router.back();
-            })
-        }
-
-        Blank()
-          .height(40)
+        .layoutWeight(1).width('100%')
       }
-      .width('100%')
-      .alignItems(HorizontalAlign.Center)
+      .width('100%').height('100%').backgroundColor('#FFFFFF').padding({ left: 48, right: 48 })
+    } else {
+      // ===== 手机模式 =====
+      Scroll() {
+        Column() {
+          Row() {
+            Button('取消').backgroundColor('#00000000').fontColor('#666666')
+              .onClick(() => { router.back(); })
+            Text(this.pageTitle).fontSize(18).fontWeight(FontWeight.Bold)
+              .layoutWeight(1).textAlign(TextAlign.Center)
+            Button('保存').backgroundColor('#4CAF50').borderRadius(8).fontColor('#FFFFFF')
+              .onClick(() => { this.saveBill(); })
+          }
+          .width('90%').height(48).margin({ top: 8 })
+
+          this.buildAmountInput()
+
+          Column() { this.buildCategoryLabel(); this.buildCategoryGrid() }
+            .width('90%').margin({ top: 24 })
+
+          Column() {
+            this.buildDateLabel()
+            DatePicker({ start: new Date('2000-01-01'), end: new Date('2100-12-31'), selected: this.parseDate(this.date) })
+              .onChange((value: DatePickerResult) => {
+                this.date = `${value.year}-${String(value.month + 1).padStart(2, '0')}-${String(value.day).padStart(2, '0')}`;
+              })
+            Text(`当前选择日期：${this.date}`).fontSize(12).fontColor('#999999').margin({ top: 4 })
+          }
+          .width('90%').margin({ top: 24 })
+
+          this.buildRemarkInput()
+
+          if (this.isEdit) {
+            Button('删除账单').width('60%').height(48).fontSize(16)
+              .backgroundColor('#F44336').borderRadius(24).margin({ top: 32 })
+              .onClick(async () => {
+                if (this.editBillId < 0) { this.amountError = '账单编号错误，无法删除'; return; }
+                await this.viewModel.deleteBill(this.editBillId);
+                router.back();
+              })
+          }
+          Blank().height(40)
+        }
+        .width('100%').alignItems(HorizontalAlign.Center)
+      }
+      .width('100%').height('100%').backgroundColor('#FFFFFF')
     }
-    .width('100%')
-    .height('100%')
-    .backgroundColor('#FFFFFF')
+  }
+
+  @Builder
+  buildAmountInput() {
+    Column() {
+      Text('金额').fontSize(14).fontColor('#666666').alignSelf(ItemAlign.Start)
+      TextInput({ placeholder: '0.00', text: this.amountInput })
+        .fontSize(32).fontWeight(FontWeight.Bold).height(60)
+        .border({
+          width: { bottom: this.amountError ? 2 : 1 },
+          color: this.amountError ? '#F44336' : '#E0E0E0'
+        })
+        .onChange((value: string) => {
+          this.amountInput = value;
+          this.onAmountChange(value);
+          if (!value || value.trim().length === 0) { this.amountError = ''; return; }
+          if (!CurrencyUtil.isValidAmount(value)) { this.amountError = '请输入有效金额（最多两位小数）'; }
+          else { this.amountError = ''; }
+        })
+      if (this.amountError) { Text(this.amountError).fontSize(12).fontColor('#F44336').margin({ top: 4 }) }
+    }
+    .width(this.isTablet ? '100%' : '90%')
+    .margin({ top: 24 })
+  }
+
+  @Builder
+  buildCategoryLabel() {
+    Text('分类').fontSize(14).fontColor('#666666').alignSelf(ItemAlign.Start).margin({ bottom: 8 })
+  }
+
+  @Builder
+  buildCategoryGrid() {
+    Grid() {
+      ForEach(this.categoryArray, (category: CategoryType) => {
+        GridItem() {
+          Text(category).fontSize(14)
+            .padding({ left: 12, right: 12, top: 6, bottom: 6 }).borderRadius(16)
+            .backgroundColor(this.selectedCategory === category ? '#4CAF50' : '#F5F5F5')
+            .fontColor(this.selectedCategory === category ? '#FFFFFF' : '#333333')
+        }
+        .onClick(() => { this.selectedCategory = category; })
+      })
+    }
+    .columnsTemplate('1fr 1fr 1fr 1fr').rowsGap(8).columnsGap(8).width('100%')
+  }
+
+  @Builder
+  buildDateLabel() {
+    Text('日期').fontSize(14).fontColor('#666666').alignSelf(ItemAlign.Start).margin({ bottom: 8 })
+  }
+
+  @Builder
+  buildDatePicker() {
+    Column() {
+      DatePicker({ start: new Date('2000-01-01'), end: new Date('2100-12-31'), selected: this.parseDate(this.date) })
+        .onChange((value: DatePickerResult) => {
+          this.date = `${value.year}-${String(value.month + 1).padStart(2, '0')}-${String(value.day).padStart(2, '0')}`;
+        })
+      Text(`当前选择日期：${this.date}`).fontSize(12).fontColor('#999999').margin({ top: 4 })
+    }
+  }
+
+  @Builder
+  buildRemarkInput() {
+    Column() {
+      Text('备注').fontSize(14).fontColor('#666666').alignSelf(ItemAlign.Start).margin({ bottom: 8 })
+      TextInput({ placeholder: '添加备注（可选）', text: this.remarkInput })
+        .maxLength(50).fontSize(14).height(44).backgroundColor('#F5F5F5').borderRadius(8)
+        .padding({ left: 12, right: 12 })
+        .onChange((value: string) => {
+          if (!this.remarkInitialized) { this.remarkInitialized = true; return; }
+          this.remarkInput = value;
+          this.onRemarkChange(value);
+        })
+    }
+    .width(this.isTablet ? '100%' : '90%')
+    .margin({ top: 24 })
   }
 
   async saveBill(): Promise<void> {
