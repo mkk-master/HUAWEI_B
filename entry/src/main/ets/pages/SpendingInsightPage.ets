@@ -423,11 +423,9 @@ struct SpendingInsightPage {
                   .fontColor('#1976D2')
                   .width('100%')
                   .margin({ bottom: 6 })
-                Text(turn.answer)
-                  .fontSize(14)
-                  .fontColor('#333333')
-                  .width('100%')
-                  .lineHeight(22)
+                ForEach(turn.answer.split('\n'), (line: string, lineIdx: number) => {
+                  this.buildMdLine(line, lineIdx)
+                }, (line: string, lineIdx: number) => `${lineIdx}-chat-${line}`)
               }
               .width('100%')
               .padding(12)
