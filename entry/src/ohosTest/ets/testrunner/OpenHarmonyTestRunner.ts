@@ -1,3 +1,18 @@
+/*
+ * Copyright (c) 2023-2024 Huawei Device Co., Ltd.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import { abilityDelegatorRegistry, TestRunner } from '@kit.TestKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -9,10 +24,12 @@ import testsuite from '../test/List.test';
 let abilityDelegator: abilityDelegatorRegistry.AbilityDelegator;
 let abilityDelegatorArguments: abilityDelegatorRegistry.AbilityDelegatorArgs;
 let jsonPath: string = 'mock/mock-config.json';
-let domain: int = 0x0000;
-let tag: string = 'testTag';
+let domain: int = 0x0000; //日志标识,0x0000作为测试框架的业务标识
+let tag: string = 'testTag'; //日志标识字符串,作为tag标识当前runner类下的测试行为
 
 export default class OpenHarmonyTestRunner implements TestRunner {
+  constructor() {
+  }
 
   onPrepare() {
     hilog.info(domain, tag, '%{public}s', 'OpenHarmonyTestRunner OnPrepare');
@@ -27,7 +44,7 @@ export default class OpenHarmonyTestRunner implements TestRunner {
     let mResourceManager = context.resourceManager;
     await checkMock(abilityDelegator, mResourceManager);
 
-    // 先启动被测应用，渲染 UI 树
+    // 启动被测应用，确保 UI 渲染完成（UiTest 需要应用在前台）
     await abilityDelegator.startAbility({
       bundleName: 'com.example.count1',
       abilityName: 'EntryAbility'
@@ -65,9 +82,9 @@ function getMockList(jsonStr: string) {
   let map: Map<string, object> = new Map<string, object>(Object.entries(jsonObj));
   let mockList: Record<string, string> = {};
   map.forEach((value: object, key: string) => {
-    let realValue: string = (value as Record<string, string>)['source'];
+    let realValue: string = value['source'].toString();
     mockList[key] = realValue;
   });
-  hilog.info(domain, tag, '%{public}s', 'mock-json value: ' + (JSON.stringify(mockList) || ''));
+  hilog.info(domain, tag, '%{public}s', 'mock-json value:' + JSON.stringify(mockList) ?? '');
   return mockList;
 }
