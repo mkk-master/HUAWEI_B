@@ -409,17 +409,27 @@ struct AddBillPage {
   }
 
   async saveBill(): Promise<void> {
-    if (!this.amountInput || this.amountInput.trim().length === 0) {
+    // 快照所有状态，避免保存过程中异步操作干扰 @State 变量
+    const snapAmount: string = this.amountInput.trim();
+    const snapCategory: CategoryType = this.selectedCategory;
+    const snapDate: string = this.date.trim();
+    const snapRemark: string = this.remarkInput.trim();
+    const snapIsEdit: boolean = this.isEdit;
+    const snapEditId: number = this.editBillId;
+
+    console.info(`saveBill: isEdit=${snapIsEdit}, id=${snapEditId}, amount="${snapAmount}", category="${snapCategory}", date="${snapDate}", remark="${snapRemark}"`);
+
+    if (!snapAmount || snapAmount.length === 0) {
       this.amountError = '请输入金额';
       return;
     }
 
-    if (!CurrencyUtil.isValidAmount(this.amountInput)) {
+    if (!CurrencyUtil.isValidAmount(snapAmount)) {
       this.amountError = '请输入有效金额（最多两位小数）';
       return;
     }
 
-    if (!this.date || this.date.trim().length === 0) {
+    if (!snapDate || snapDate.length === 0) {
       this.amountError = '请选择日期';
       return;
     }
@@ -427,25 +437,25 @@ struct AddBillPage {
     try {
       let success = false;
 
-      if (this.isEdit) {
-        if (this.editBillId < 0) {
+      if (snapIsEdit) {
+        if (snapEditId < 0) {
           this.amountError = '账单编号错误，无法修改';
           return;
         }
 
         success = await this.viewModel.updateBill(
-          this.editBillId,
-          this.amountInput.trim(),
-          this.selectedCategory,
-          this.date.trim(),
-          this.remarkInput.trim()
+          snapEditId,
+          snapAmount,
+          snapCategory,
+          snapDate,
+          snapRemark
         );
       } else {
         success = await this.viewModel.addBill(
-          this.amountInput.trim(),
-          this.selectedCategory,
-          this.date.trim(),
-          this.remarkInput.trim()
+          snapAmount,
+          snapCategory,
+          snapDate,
+          snapRemark
         );
       }
 
