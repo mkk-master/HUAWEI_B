@@ -16,12 +16,6 @@ interface InsightChatTurn {
   answer: string;
 }
 
-interface MarkdownToken {
-  type: 'h2' | 'h3' | 'bullet' | 'bold' | 'text';
-  content: string;
-  boldSegments?: Array<{ text: string; bold: boolean }>;
-}
-
 const PREFERENCES_NAME: string = 'count1_prefs';
 const PREF_KEY_DASHSCOPE_API: string = 'dashscope_api_key';
 
@@ -102,83 +96,34 @@ struct SpendingInsightPage {
   }
 
   /**
-   * 简单 Markdown 渲染器：按换行切分，逐行解析并返回对应样式的 Text
-   */
-  @Builder
-  buildMarkdownBlock(mdText: string) {
-    Column() {
-      ForEach(mdText.split('\n'), (line: string, index: number) => {
-        if (line.length === 0) {
-          // 空行 → 留白
-          Blank().height(8)
-        } else if (line.startsWith('## ')) {
-          // ## 二级标题
-          Text(line.substring(3).trim())
-            .fontSize(17)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#1a1a1a')
-            .width('100%')
-            .margin({ top: 16, bottom: 6 })
-        } else if (line.startsWith('### ')) {
-          // ### 三级标题
-          Text(line.substring(4).trim())
-            .fontSize(15)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#333333')
-            .width('100%')
-            .margin({ top: 12, bottom: 4 })
-        } else if (line.startsWith('- ') || line.startsWith('* ')) {
-          // 无序列表
-          Row() {
-            Text('•')
-              .fontSize(14)
-              .fontColor('#666666')
-              .margin({ right: 8 })
-            Text(this.stripBoldMarkers(line.substring(2).trim()))
-              .fontSize(14)
-              .fontColor('#444444')
-              .layoutWeight(1)
-              .lineHeight(20)
-          }
-          .width('100%')
-          .padding({ left: 4 })
-          .margin({ top: 2, bottom: 2 })
-        } else if (/^\d+[\.\、]\s/.test(line)) {
-          // 有序列表
-          const dotIdx: number = line.indexOf('.') > 0 ? line.indexOf('.') : line.indexOf('、');
-          Row() {
-            Text(line.substring(0, dotIdx + 1))
-              .fontSize(14)
-              .fontColor('#666666')
-              .margin({ right: 8 })
-            Text(this.stripBoldMarkers(line.substring(dotIdx + 1).trim()))
-              .fontSize(14)
-              .fontColor('#444444')
-              .layoutWeight(1)
-              .lineHeight(20)
-          }
-          .width('100%')
-          .padding({ left: 4 })
-          .margin({ top: 2, bottom: 2 })
-        } else {
-          // 普通段落
-          Text(this.stripBoldMarkers(line.trim()))
-            .fontSize(14)
-            .fontColor('#444444')
-            .width('100%')
-            .lineHeight(22)
-        }
-      }, (line: string, index: number) => `${index}_${line.substring(0, Math.min(line.length, 20))}`)
-    }
-    .width('100%')
-    .alignItems(HorizontalAlign.Start)
-  }
-
-  /**
-   * 去除 **粗体** 标记（HarmonyOS Text 不原生支持内联粗体，先做清理渲染）
+   * 去除 **粗体** 标记（HarmonyOS Text 不原生支持内联粗体）
    */
   private stripBoldMarkers(text: string): string {
     return text.replace(/\*\*/g, '');
+  }
+
+  @Builder
+  buildMdLine(line: string, _idx: number) {
+    if (line.length === 0) {
+      Blank().height(8)
+    } else if (line.startsWith('## ')) {
+      Text(line.substring(3).trim())
+        .fontSize(17).fontWeight(FontWeight.Bold).fontColor('#1a1a1a')
+        .width('100%').margin({ top: 16, bottom: 6 })
+    } else if (line.startsWith('### ')) {
+      Text(line.substring(4).trim())
+        .fontSize(15).fontWeight(FontWeight.Bold).fontColor('#333333')
+        .width('100%').margin({ top: 12, bottom: 4 })
+    } else if (line.startsWith('- ') || line.startsWith('* ')) {
+      Row() {
+        Text('•').fontSize(14).fontColor('#666666').margin({ right: 8 })
+        Text(this.stripBoldMarkers(line.substring(2).trim()))
+          .fontSize(14).fontColor('#444444').layoutWeight(1).lineHeight(20)
+      }.width('100%').padding({ left: 4 }).margin({ top: 2, bottom: 2 })
+    } else {
+      Text(this.stripBoldMarkers(line.trim()))
+        .fontSize(14).fontColor('#444444').width('100%').lineHeight(22)
+    }
   }
 
   async refreshDataPayload(): Promise<void> {
@@ -310,7 +255,9 @@ struct SpendingInsightPage {
 
               Column() {
                 if (this.reportText.length > 0) {
-                  this.buildMarkdownBlock(this.reportText)
+                  ForEach(this.reportText.split('\n'), (line: string, idx: number) => {
+                    this.buildMdLine(line, idx)
+                  }, (line: string, idx: number) => `${idx}_${line}`)
                 } else {
                   Text('点击上方按钮生成报告')
                     .fontSize(14)
@@ -355,7 +302,9 @@ struct SpendingInsightPage {
                       .fontColor('#1976D2')
                       .width('100%')
                       .margin({ bottom: 6 })
-                    this.buildMarkdownBlock(turn.answer)
+                    ForEach(turn.answer.split('\n'), (line: string, lineIdx: number) => {
+                      this.buildMdLine(line, lineIdx)
+                    }, (line: string, lineIdx: number) => `${lineIdx}-chat-${line}`)
                   }
                   .width('100%')
                   .padding(12)
@@ -441,7 +390,9 @@ struct SpendingInsightPage {
 
             Column() {
               if (this.reportText.length > 0) {
-                this.buildMarkdownBlock(this.reportText)
+                ForEach(this.reportText.split('\n'), (line: string, idx: number) => {
+                  this.buildMdLine(line, idx)
+                }, (line: string, idx: number) => `${idx}_${line}`)
               } else {
                 Text('点击上方按钮生成报告（含消费结构、预算执行、超支原因与节流建议）')
                   .fontSize(14)
