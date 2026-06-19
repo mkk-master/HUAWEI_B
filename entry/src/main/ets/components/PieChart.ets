@@ -134,7 +134,7 @@ export struct PieChart {
 
     const total = adjustedData.reduce((sum, item) => sum + item.amount, 0);
     if (total === 0) {
-      ctx.font = '26px sans-serif';
+      ctx.font = '32px sans-serif';
       ctx.fillStyle = '#999';
       ctx.textAlign = 'center';
       ctx.fillText('暂无消费数据', centerX, centerY);

@@ -1,0 +1,8 @@
+{
+  "src": [
+    "pages/Index",
+    "pages/AddBillPage",
+    "pages/StatisticsPage",
+    "pages/BudgetPage"
+  ]
+}
