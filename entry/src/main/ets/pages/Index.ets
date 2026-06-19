@@ -663,6 +663,18 @@ struct Index {
     })
   }
 
+  /**
+   * 获取饼图数据：
+   * - 分类筛选时（filterCategory 不为空），饼图展示全月完整分类结构，不受筛选影响
+   * - 仅关键字搜索时，饼图跟随搜索结果变化，展示匹配账单的分类分布
+   */
+  private getPieData(): CategorySummaryItem[] {
+    if (this.filterCategory && this.filterCategory.length > 0) {
+      return this.viewModel.getCategorySummaryAll();
+    }
+    return this.viewModel.getCategorySummary();
+  }
+
   // 平板模式下右侧的统计面板
   @Builder
   buildTabletStatsPanel() {
@@ -674,10 +686,10 @@ struct Index {
           .fontColor('#333333')
           .margin({ top: 16, bottom: 12 })
 
-        // 饼图
-        if (this.viewModel.getCategorySummary().length > 0) {
+        // 饼图：分类筛选时展示全月数据，仅关键字搜索时才跟随筛选
+        if (this.getPieData().length > 0) {
           PieChart({
-            data: this.viewModel.getCategorySummary()
+            data: this.getPieData()
           })
             .key(`pie-tablet-${this.refreshFlag}`)
         }
@@ -738,15 +750,15 @@ struct Index {
         .shadow({ radius: 8, color: '#10000000', offsetX: 0, offsetY: 2 })
         .margin({ bottom: 16 })
 
-        // 分类统计列表
-        if (this.viewModel.getCategorySummary().length > 0) {
+        // 分类统计列表（与饼图使用同一数据源）
+        if (this.getPieData().length > 0) {
           Text('分类明细')
             .fontSize(15)
             .fontWeight(FontWeight.Medium)
             .alignSelf(ItemAlign.Start)
             .margin({ bottom: 8 })
 
-          ForEach(this.viewModel.getCategorySummary(), (item: CategorySummaryItem) => {
+          ForEach(this.getPieData(), (item: CategorySummaryItem) => {
             Row() {
               Circle({ width: 12, height: 12 })
                 .fill(CategoryColors[item.category] || '#CCCCCC')

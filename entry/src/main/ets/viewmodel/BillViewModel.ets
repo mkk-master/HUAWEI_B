@@ -22,6 +22,9 @@ export class BillViewModel {
   // 当前页面列表显示的账单，可以被搜索关键字、类型筛选影响
   public bills: BillModel[] = [];
 
+  // 当前月份全部账单（不受筛选影响），供饼图等需要全量数据的地方使用
+  public allMonthBills: BillModel[] = [];
+
   // 当前查看的月份，例如 2026-04
   public currentMonth: string = '';
 
@@ -105,9 +108,9 @@ export class BillViewModel {
     try {
       this.monthlyBudget = await this.dbHelper.getBudget(this.currentMonth);
 
-      const allMonthBills = await this.dbHelper.queryBills(this.currentMonth);
+      this.allMonthBills = await this.dbHelper.queryBills(this.currentMonth);
 
-      this.monthlyTotal = allMonthBills.reduce((sum: number, bill: BillModel) => {
+      this.monthlyTotal = this.allMonthBills.reduce((sum: number, bill: BillModel) => {
         return sum + bill.amount;
       }, 0);
 
@@ -328,17 +331,25 @@ export class BillViewModel {
   }
 
   /**
-   * 分类统计
-   *
-   * 这里仍然基于 this.bills，
-   * 所以它会跟随当前首页筛选结果变化。
-   * 如果你希望统计页也永远统计整月全部账单，
-   * 后面可以单独再改 StatisticsPage。
+   * 分类统计（基于筛选后的 bills）
+   * 仅关键字搜索时饼图使用此方法，以展示搜索结果中的分类分布。
    */
   getCategorySummary(): Array<CategorySummary> {
+    return this.aggregateCategorySummary(this.bills);
+  }
+
+  /**
+   * 分类统计（基于全月账单 allMonthBills）
+   * 分类筛选时饼图使用此方法，保持展示整月完整分类结构。
+   */
+  getCategorySummaryAll(): Array<CategorySummary> {
+    return this.aggregateCategorySummary(this.allMonthBills);
+  }
+
+  private aggregateCategorySummary(bills: BillModel[]): Array<CategorySummary> {
     const summaryMap = new Map<string, number>();
 
-    this.bills.forEach((bill: BillModel) => {
+    bills.forEach((bill: BillModel) => {
       const current = summaryMap.get(bill.category) || 0;
       summaryMap.set(bill.category, current + bill.amount);
     });
