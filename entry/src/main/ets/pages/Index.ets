@@ -4,7 +4,7 @@ import { CurrencyUtil } from '../utils/CurrencyUtil';
 import { BillModel, CategoryType, CategoryColors } from '../model/BillModel';
 import { DatabaseHelper } from '../database/DatabaseHelper';
 import router from '@ohos.router';
-import { display } from '@ohos.display';
+import display from '@ohos.display';
 
 interface SelectOption {
   value: ResourceStr;
@@ -62,8 +62,8 @@ struct Index {
       return true;
     }
     try {
-      const dsp = display.getDefaultDisplaySync();
-      const widthVp = px2vp(dsp.width);
+      const dsp: display.Display = display.getDefaultDisplaySync();
+      const widthVp: number = px2vp(dsp.width) as number;
       if (widthVp >= 600) {
         return true;
       }
