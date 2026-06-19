@@ -26,6 +26,7 @@ struct AddBillPage {
   @State selectedCategory: CategoryType = CategoryType.FOOD;
   @State date: string = this.formatDate(new Date());
   @State remarkInput: string = '';
+  @State remarkInitialized: boolean = false;
   @State amountError: string = '';
   @State isEdit: boolean = false;
   @State editBillId: number = -1;
@@ -70,6 +71,8 @@ struct AddBillPage {
     await this.dbHelper.initDatabase(getContext(this));
     await this.viewModel.init();
     await this.loadCloudApiKeyFromPreferences();
+    // 重置 TextInput 初始化标记（每次进入页面都重置）
+    this.remarkInitialized = false;
     const fastText: FastTextInference = new FastTextInference();
     // 预加载词向量表
     try {
@@ -335,6 +338,11 @@ struct AddBillPage {
               right: 12
             })
             .onChange((value: string) => {
+              // 忽略 TextInput 初始化时框架触发的空 onChange
+              if (!this.remarkInitialized) {
+                this.remarkInitialized = true;
+                return;
+              }
               this.remarkInput = value;
               this.onRemarkChange(value);
             })
