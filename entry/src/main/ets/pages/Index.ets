@@ -138,7 +138,7 @@ struct Index {
                   });
                 })
               }, (bill: BillModel) => {
-                return bill.id.toString();
+                return `${bill.id}_${bill.category}_${bill.remark}_${this.refreshFlag}`;
               })
             }
             .layoutWeight(1)
@@ -196,7 +196,7 @@ struct Index {
                 end: this.buildSwipeActions(bill)
               })
             }, (bill: BillModel) => {
-              return bill.id.toString();
+              return `${bill.id}_${bill.category}_${bill.remark}_${this.refreshFlag}`;
             })
           }
           .layoutWeight(1)
