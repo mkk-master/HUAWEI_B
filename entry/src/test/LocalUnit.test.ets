@@ -1,8 +1,8 @@
 // 本地单元测试 — 不依赖设备，验证核心工具类与数据模型
 
 import { describe, it, expect } from '@ohos/hypium';
-import { CurrencyUtil } from '../../main/ets/utils/CurrencyUtil';
-import { BillModel, CategoryType, BudgetModel, CategoryColors } from '../../main/ets/model/BillModel';
+import { CurrencyUtil } from '../main/ets/utils/CurrencyUtil';
+import { BillModel, CategoryType, BudgetModel, CategoryColors } from '../main/ets/model/BillModel';
 
 export default function localUnitTest() {
   describe('CurrencyUtilTest', () => {
@@ -15,15 +15,24 @@ export default function localUnitTest() {
     });
 
     it('fenToYuan_large', 0, () => {
-      expect(CurrencyUtil.fenToYuan(123456789)).assertEqual('12345.68万');
+      expect(CurrencyUtil.fenToYuan(123456789)).assertEqual('123.46万');
+    });
+
+    it('fenToYuan_yi', 0, () => {
       expect(CurrencyUtil.fenToYuan(12345678900)).assertEqual('1.23亿');
     });
 
-    it('yuanToFen_normal_and_invalid', 0, () => {
+    it('yuanToFen_normal', 0, () => {
       expect(CurrencyUtil.yuanToFen('1.00')).assertEqual(100);
       expect(CurrencyUtil.yuanToFen('0.5')).assertEqual(50);
-      expect(isNaN(CurrencyUtil.yuanToFen('abc'))).assertTrue();
-      expect(isNaN(CurrencyUtil.yuanToFen('-1'))).assertTrue();
+    });
+
+    it('yuanToFen_invalid', 0, () => {
+      // 'abc'/'-1' 返回 NaN，NaN 的唯一特性是自身不相等
+      const r1: number = CurrencyUtil.yuanToFen('abc');
+      const r2: number = CurrencyUtil.yuanToFen('-1');
+      expect(r1 !== r1).assertTrue();
+      expect(r2 !== r2).assertTrue();
     });
 
     it('isValidAmount_check', 0, () => {
