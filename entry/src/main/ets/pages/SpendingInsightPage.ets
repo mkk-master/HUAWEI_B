@@ -52,13 +52,17 @@ struct SpendingInsightPage {
     await this.viewModel.loadBudget();
     await this.loadCloudApiKeyFromPreferences();
     await this.refreshDataPayload();
+    //await this.onGenerateReport();
   }
 
   async loadCloudApiKeyFromPreferences(): Promise<void> {
     try {
       const pref = await dataPreferences.getPreferences(getContext(this), PREFERENCES_NAME);
       const saved = await pref.get(PREF_KEY_DASHSCOPE_API, '') as string;
-      CloudAiConfig.apiKey = saved.trim();
+      const trimmed = saved.trim();
+      if (trimmed.length > 0) {
+        CloudAiConfig.apiKey = trimmed;
+      }
       if (CloudAiConfig.apiKey.length === 0) {
         this.hintText = '请先在「记一笔」页填写 DashScope API Key，或在本页生成报告前完成配置。';
       } else {

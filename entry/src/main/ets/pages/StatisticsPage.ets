@@ -42,6 +42,7 @@ struct StatisticsPage {
     }
 
     return new Date(year, monthIndex, 1);
+
   }
 
   async aboutToAppear(): Promise<void> {
@@ -63,6 +64,7 @@ struct StatisticsPage {
     }
 
     await this.loadStatisticsByMonth();
+
   }
 
   async loadStatisticsByMonth(): Promise<void> {
@@ -76,6 +78,7 @@ struct StatisticsPage {
     this.selectedMonth = this.formatMonth(date);
 
     await this.loadStatisticsByMonth();
+
   }
 
   async goNextMonth(): Promise<void> {
@@ -84,12 +87,14 @@ struct StatisticsPage {
     this.selectedMonth = this.formatMonth(date);
 
     await this.loadStatisticsByMonth();
+
   }
 
   async goCurrentMonth(): Promise<void> {
     this.selectedMonth = this.formatMonth(new Date());
 
     await this.loadStatisticsByMonth();
+
   }
 
   build() {
@@ -232,6 +237,8 @@ struct StatisticsPage {
               PieChart({
                 data: this.viewModel.getCategorySummary()
               })
+              // Canvas.onReady 只触发一次；切换月份后强制换新实例以重绘饼图
+                .key(`pie-${this.refreshFlag}`)
             }
             .width('100%')
             .padding({ bottom: 32 })
@@ -289,5 +296,6 @@ struct StatisticsPage {
     .width('100%')
     .height('100%')
     .backgroundColor('#F5F5F5')
+
   }
 }

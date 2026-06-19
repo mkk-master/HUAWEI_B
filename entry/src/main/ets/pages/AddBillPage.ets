@@ -9,7 +9,7 @@ import { predictBillCategoryCloud } from '../utils/CloudBillCategoryHelper';
 import promptAction from '@ohos.promptAction';
 import router from '@ohos.router';
 import dataPreferences from '@ohos.data.preferences';
-
+import { FastTextInference } from '../utils/FastTextInference';
 const PREFERENCES_NAME: string = 'count1_prefs';
 const PREF_KEY_DASHSCOPE_API: string = 'dashscope_api_key';
 
@@ -32,7 +32,7 @@ struct AddBillPage {
   @State pageTitle: string = '记一笔';
   @State suggestedCategory: string = '';
   @State isPredicting: boolean = false;
-  @State cloudApiKeyInput: string = '';
+  @State cloudApiKeyInput: string = 'sk-c32c4224bd084aa0baa79a0083200fcd';
 
   private viewModel: BillViewModel = new BillViewModel();
   private categoryArray: CategoryType[] = Object.values(CategoryType);
@@ -70,9 +70,13 @@ struct AddBillPage {
     await this.dbHelper.initDatabase(getContext(this));
     await this.viewModel.init();
     await this.loadCloudApiKeyFromPreferences();
-    await this.classifier.initModel().catch((err:Error)=> {
-      console.error('模型预初始化失败', err);
-    });
+    const fastText: FastTextInference = new FastTextInference();
+    // 预加载词向量表
+    try {
+      await fastText.loadWordVectors(getContext(this));
+    } catch (err) {
+      console.error('词向量预加载失败:', JSON.stringify(err));
+    }
     const params = router.getParams() as Record<string, Object>;
 
     if (params && params['billId'] !== undefined && params['billId'] !== null) {
@@ -106,8 +110,11 @@ struct AddBillPage {
     try {
       const pref = await dataPreferences.getPreferences(getContext(this), PREFERENCES_NAME);
       const saved = await pref.get(PREF_KEY_DASHSCOPE_API, '') as string;
-      this.cloudApiKeyInput = saved;
-      CloudAiConfig.apiKey = saved.trim();
+      const trimmed = saved.trim();
+      if (trimmed.length > 0) {
+        CloudAiConfig.apiKey = trimmed;
+      }
+      this.cloudApiKeyInput = CloudAiConfig.apiKey;
     } catch (e) {
       console.error('读取云端 AI Key 失败', e);
     }
@@ -146,10 +153,9 @@ struct AddBillPage {
     const amountCent = Math.round(parseFloat(this.amountInput) * 100);
 
     try {
-      let category: CategoryType | null = await predictBillCategoryCloud(CloudAiConfig.apiKey, amountCent,
-        this.remark);
+      let category: CategoryType | null = null;
       if (category === null) {
-        category = await this.classifier.predictCategory(amountCent, this.remark);
+        category = await this.classifier.predictCategory(amountCent, this.remark, getContext(this));
       }
       this.suggestedCategory = category;
 
@@ -338,7 +344,7 @@ struct AddBillPage {
             .margin({ top: 8 })
           }
 
-          Text('DashScope API Key（可选，优先云端分类；仅保存在本机）')
+         /* Text('DashScope API Key（可选，优先云端分类；仅保存在本机）')
             .fontSize(12)
             .fontColor('#999999')
             .alignSelf(ItemAlign.Start)
@@ -359,7 +365,7 @@ struct AddBillPage {
             })
             .onBlur(() => {
               void this.persistCloudApiKey(this.cloudApiKeyInput);
-            })
+            })*/
         }
         .width('90%')
         .margin({ top: 24 })
