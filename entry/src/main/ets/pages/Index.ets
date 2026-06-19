@@ -190,22 +190,10 @@ struct Index {
           List() {
             ForEach(this.viewModel.bills, (bill: BillModel) => {
               ListItem() {
-                this.buildBillItemWithoutClick(bill)
+                this.buildBillItem(bill)
               }
               .swipeAction({
                 end: this.buildSwipeActions(bill)
-              })
-              .onClick(async () => {
-                await router.pushUrl({
-                  url: 'pages/AddBillPage',
-                  params: {
-                    billId: String(bill.id),
-                    amount: CurrencyUtil.fenToYuan(bill.amount),
-                    category: bill.category,
-                    date: bill.date,
-                    remark: bill.remark || ''
-                  }
-                });
               })
             }, (bill: BillModel) => {
               return bill.id.toString();
@@ -524,7 +512,7 @@ struct Index {
   }
 
   @Builder
-  buildBillItemWithoutClick(bill: BillModel) {
+  buildBillItem(bill: BillModel) {
     Row() {
       Column() {
         Text(bill.category)
@@ -558,11 +546,24 @@ struct Index {
     .padding(12)
     .backgroundColor('#FFFFFF')
     .borderRadius(8)
+    .hitTestBehavior(HitTestMode.Block)
     .margin({
       left: '5%',
       right: '5%',
       top: 6,
       bottom: 6
+    })
+    .onClick(async () => {
+      await router.pushUrl({
+        url: 'pages/AddBillPage',
+        params: {
+          billId: String(bill.id),
+          amount: CurrencyUtil.fenToYuan(bill.amount),
+          category: bill.category,
+          date: bill.date,
+          remark: bill.remark || ''
+        }
+      });
     })
   }
 
