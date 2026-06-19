@@ -4,7 +4,7 @@ import { CurrencyUtil } from '../utils/CurrencyUtil';
 import { BillModel, CategoryType, CategoryColors } from '../model/BillModel';
 import { DatabaseHelper } from '../database/DatabaseHelper';
 import router from '@ohos.router';
-import display from '@ohos.display';
+import { window } from '@kit.ArkUI';
 
 interface SelectOption {
   value: ResourceStr;
@@ -23,6 +23,7 @@ struct Index {
   @State searchKeyword: string = '';
   @State filterCategory: string = '';
   @State refreshFlag: number = 0;
+  @State isTablet: boolean = false;
   @StorageLink('currentBreakpoint') currentBreakpoint: string = 'sm';
 
   private categoryOptions: SelectOption[] = this.createCategoryOptions();
@@ -33,6 +34,7 @@ struct Index {
     await this.viewModel.init();
     this.categoryOptions = this.createCategoryOptions();
     await this.refreshData();
+    await this.detectTabletMode();
   }
 
   onPageShow(): void {
@@ -53,24 +55,26 @@ struct Index {
   }
 
   /**
-   * 双保险判断平板布局：
-   * 1. 优先用 @StorageLink 断点（系统响应式机制）
-   * 2. 退回 display API 读屏幕物理宽度（≥ 600vp 视为平板）
+   * 双保险检测平板模式：
+   * 1. 优先跟 @StorageLink 断点
+   * 2. 退回 window.getLastWindow 读实际宽度
    */
-  private isTabletLayout(): boolean {
+  private async detectTabletMode(): Promise<void> {
     if (this.currentBreakpoint === 'md' || this.currentBreakpoint === 'lg' || this.currentBreakpoint === 'xl') {
-      return true;
+      this.isTablet = true;
+      return;
     }
     try {
-      const dsp: display.Display = display.getDefaultDisplaySync();
-      const widthVp: number = px2vp(dsp.width) as number;
+      const win = await window.getLastWindow(getContext(this));
+      const props = win.getWindowProperties();
+      const rect = props.windowRect;
+      const widthVp: number = px2vp(rect.width) as number;
       if (widthVp >= 600) {
-        return true;
+        this.isTablet = true;
       }
     } catch (e) {
-      // display API 不可用时仅依赖断点
+      // 不可用时保持默认值 false
     }
-    return false;
   }
 
   private createCategoryOptions(): SelectOption[] {
@@ -87,7 +91,7 @@ struct Index {
   }
 
   build() {
-    if (this.isTabletLayout()) {
+    if (this.isTablet) {
       // ===== 平板模式：双栏布局 =====
       SideBarContainer(SideBarContainerType.Embed) {
         // 左侧栏：账单列表 + 搜索/筛选
