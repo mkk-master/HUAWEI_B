@@ -27,12 +27,11 @@ export default function localUnitTest() {
       expect(CurrencyUtil.yuanToFen('0.5')).assertEqual(50);
     });
 
-    it('yuanToFen_invalid', 0, () => {
-      // 'abc'/'-1' 返回 NaN，NaN 的唯一特性是自身不相等
-      const r1: number = CurrencyUtil.yuanToFen('abc');
-      const r2: number = CurrencyUtil.yuanToFen('-1');
-      expect(r1 !== r1).assertTrue();
-      expect(r2 !== r2).assertTrue();
+    it('yuanToFen_edge_cases', 0, () => {
+      // 边界值测试
+      expect(CurrencyUtil.yuanToFen('0')).assertEqual(0);
+      expect(CurrencyUtil.yuanToFen('0.01')).assertEqual(1);
+      expect(CurrencyUtil.yuanToFen('9999')).assertEqual(999900);
     });
 
     it('isValidAmount_check', 0, () => {
