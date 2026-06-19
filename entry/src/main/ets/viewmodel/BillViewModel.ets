@@ -2,10 +2,18 @@
 import { BillModel, BudgetModel, CategoryType } from '../model/BillModel';
 import { DatabaseHelper } from '../database/DatabaseHelper';
 import { CurrencyUtil } from '../utils/CurrencyUtil';
+import { nativeGenerateMonthlyReport } from '../utils/NativeReportHelper';
 
 interface CategorySummary {
   category: string;
   amount: number;
+}
+
+interface BillJsonItem {
+  amount: number;
+  category: string;
+  date: string;
+  remark: string;
 }
 
 export class BillViewModel {
@@ -345,6 +353,8 @@ export class BillViewModel {
 
   /**
    * 生成某月全量账单的纯文本摘要，供云端模型做消费分析（不受首页列表筛选影响）。
+   *
+   * 优先使用 Native C++ 层计算，失败时自动回退到 ArkTS 纯逻辑。
    */
   async buildMonthlyInsightDataText(month: string): Promise<string> {
     if (!month || month.length !== 7) {
@@ -353,6 +363,39 @@ export class BillViewModel {
 
     const budgetFen = await this.dbHelper.getBudget(month);
     const bills = await this.dbHelper.queryBills(month);
+
+    // 准备 C++ 侧需要的 JSON 字符串
+    const billsJsonItems: BillJsonItem[] = bills.map((b: BillModel): BillJsonItem => {
+      return {
+        amount: b.amount,
+        category: b.category,
+        date: b.date,
+        remark: b.remark
+      } as BillJsonItem;
+    });
+    const billsJson = JSON.stringify(billsJsonItems);
+
+    // 优先走 Native C++ 报表引擎
+    try {
+      const nativeResult: string = nativeGenerateMonthlyReport(budgetFen, billsJson);
+      if (nativeResult && nativeResult.length > 0) {
+        // 前置月份信息（Native 报告不含月份头）
+        return `月份：${month}\n${nativeResult}`;
+      }
+    } catch (e) {
+      console.error('Native 报表生成失败，回退到 ArkTS 逻辑: ' + JSON.stringify(e));
+    }
+
+    // 回退：使用原有 ArkTS 纯逻辑
+    return this.buildMonthlyInsightDataTextFallback(month, bills, budgetFen);
+  }
+
+  /**
+   * ArkTS 侧兜底实现（保留原有逻辑，Native 加载失败时使用）。
+   */
+  private buildMonthlyInsightDataTextFallback(
+    month: string, bills: BillModel[], budgetFen: number
+  ): string {
     const totalFen = bills.reduce((sum: number, bill: BillModel) => {
       return sum + bill.amount;
     }, 0);

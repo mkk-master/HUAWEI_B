@@ -7,6 +7,7 @@
     "deviceTypes": [
       "default",
       "phone",
+      "tablet",
       "2in1"
     ],
     "deliveryWithInstall": true,
@@ -35,7 +36,7 @@
       }
     ],
     "requestPermissions": [
-      { "name": "ohos.permission.INTERNET" }
+      { "name": "ohos.permission.INTERNET" },
     ],
     "extensionAbilities": [
       {
