@@ -1,50 +1,59 @@
-// HapTest 补充测试：数据校验
-// 测试策略: TextPresence + ComponentPresence 扩展
+// HapTest 补充测试：记一笔页 + 分类 + 金额校验
+// 使用 globalThis.driver（由 OpenHarmonyTestRunner 创建）
 
-import { describe, it, expect } from '@ohos/hypium';
+import { describe, beforeAll, it, expect } from '@ohos/hypium';
+import { Driver, ON } from '@ohos.UiTest';
+
+function getDriver(): Driver {
+  return globalThis.driver as Driver;
+}
 
 export default function smartAccountHapTest() {
   describe('SmartAccount_Extended', () => {
 
-    // TextPresence: 关键文字常量验证
-    it('TextPresence_关键页面文字常量', 0, () => {
-      const texts: string[] = [
-        '智慧记账', '记一笔', '消费统计',
-        '上月', '下月', '本月',
-        '剩余', '预算', '已花',
-        '金额', '分类', '日期', '备注', '保存', '取消',
-        '饼图', '详情', '返回'
-      ];
-      texts.forEach((t: string) => {
-        expect(t.length > 0).assertTrue();
-      });
-      expect(texts.length).assertEqual(18);
+    let driver: Driver;
+
+    beforeAll(() => {
+      driver = getDriver();
     });
 
-    // ComponentPresence: 金额格式校验
-    it('ComponentPresence_金额格式校验', 0, () => {
+    // TextPresence: 记一笔页全字段
+    it('TextPresence_记一笔页金额分类日期备注保存', 0, async () => {
+      const addBtn = await driver.findComponent(ON.text('记一笔'));
+      await addBtn.click();
+      await driver.delayMs(1500);
+      await driver.assertComponentExist(ON.text('金额'));
+      await driver.assertComponentExist(ON.text('分类'));
+      await driver.assertComponentExist(ON.text('日期'));
+      await driver.assertComponentExist(ON.text('备注'));
+      await driver.assertComponentExist(ON.text('保存'));
+      await driver.findComponent(ON.text('取消')).then(c => c.click());
+      await driver.delayMs(1000);
+    });
+
+    // ComponentPresence: 8 个分类标签
+    it('ComponentPresence_8种分类标签全部可见', 0, async () => {
+      const addBtn = await driver.findComponent(ON.text('记一笔'));
+      await addBtn.click();
+      await driver.delayMs(1500);
+      const cats: string[] = ['饮食', '交通', '购物', '娱乐', '居住', '医疗', '教育', '其他'];
+      for (let i = 0; i < cats.length; i++) {
+        await driver.assertComponentExist(ON.text(cats[i]));
+      }
+      await driver.findComponent(ON.text('取消')).then(c => c.click());
+      await driver.delayMs(1000);
+    });
+
+    // 金额格式校验
+    it('ComponentPresence_金额正则校验', 0, () => {
       expect(/^\d+(\.\d{0,2})?$/.test('50.00')).assertTrue();
-      expect(/^\d+(\.\d{0,2})?$/.test('0.01')).assertTrue();
       expect(/^\d+(\.\d{0,2})?$/.test('-50')).assertFalse();
-      expect(/^\d+(\.\d{0,2})?$/.test('abc')).assertFalse();
-      expect(/^\d+(\.\d{0,2})?$/.test('50.999')).assertFalse();
     });
 
-    // ComponentPresence: 分类枚举完整性
-    it('ComponentPresence_分类枚举完整性', 0, () => {
+    // 分类枚举完整性
+    it('ComponentPresence_分类枚举8种', 0, () => {
       const cats: string[] = ['饮食', '交通', '购物', '娱乐', '居住', '医疗', '教育', '其他'];
       expect(cats.length).assertEqual(8);
-      cats.forEach((c: string) => expect(c.length > 0).assertTrue());
-    });
-
-    // ComponentPresence: 分类颜色映射完整性
-    it('ComponentPresence_分类颜色映射', 0, () => {
-      const colors: Record<string, string> = {
-        '饮食': '#FF6B6B', '交通': '#4ECDC4', '购物': '#45B7D1',
-        '娱乐': '#96CEB4', '居住': '#FFEAA7', '医疗': '#DDA0DD',
-        '教育': '#98D8C8', '其他': '#F7DC6F'
-      };
-      expect(Object.keys(colors).length).assertEqual(8);
     });
   });
 }

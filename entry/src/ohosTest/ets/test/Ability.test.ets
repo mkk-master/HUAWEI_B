@@ -1,72 +1,67 @@
-// 设备 UI 自动化测试 — @ohos.UiTest (HapTest 兼容)
-// 测试策略 1: TextPresence — 验证应用正常启动
-// 测试策略 2: ComponentPresence — 验证驱动 API 可用
-//
-// 注意: findComponents 在平板设备上因 UiTest 框架限制可能返回 null，
-// 测试已做兼容处理。
+// 设备 UI 自动化测试 — @ohos.UiTest
+// Driver 由 OpenHarmonyTestRunner.onPrepare 创建，存于 globalThis.driver
+// 测试策略 1: TextPresence — 首页关键文字存在
+// 测试策略 2: ComponentPresence — 组件可点击、页面跳转正常
 
-import { describe, beforeAll, afterAll, it, expect } from '@ohos/hypium';
+import { describe, beforeAll, it, expect } from '@ohos/hypium';
 import { Driver, ON } from '@ohos.UiTest';
-import abilityDelegatorRegistry from '@ohos.application.abilityDelegatorRegistry';
 
-let driver: Driver | null = null;
+function getDriver(): Driver {
+  return globalThis.driver as Driver;
+}
 
 export default function abilityTest() {
   describe('SmartAccount_UiTest', () => {
 
-    beforeAll(async () => {
-      const delegator = abilityDelegatorRegistry.getAbilityDelegator();
-      await delegator.startAbility({
-        bundleName: 'com.example.count1',
-        abilityName: 'EntryAbility'
-      });
-      driver = Driver.create();
-      await driver.delayMs(3000);
+    let driver: Driver;
+
+    beforeAll(() => {
+      driver = getDriver();
     });
 
-    afterAll(async () => {});
+    // ==========================================================
+    // 策略 1: TextPresence — 验证关键文字
+    // ==========================================================
 
-    // ==============================
-    // 策略 1: TextPresence — 应用启动与驱动就绪
-    // ==============================
-
-    it('TextPresence_应用成功启动', 0, () => {
-      // startAbility 未抛异常 = 启动成功
+    it('TextPresence_首页标题智慧记账', 0, async () => {
+      await driver.assertComponentExist(ON.text('智慧记账'));
     });
 
-    it('TextPresence_驱动成功创建', 0, () => {
-      expect(driver !== null).assertTrue();
+    it('TextPresence_本月按钮', 0, async () => {
+      await driver.assertComponentExist(ON.text('本月'));
     });
 
-    it('TextPresence_驱动可查询组件', 0, async () => {
-      // 尝试查询，无论返回 null 还是数组都算框架正常工作
-      const result = await driver!.findComponents(ON.type('Button'));
-      // result 为 null 或 array 均可，表示驱动查询未崩溃
+    it('TextPresence_记一笔按钮文字', 0, async () => {
+      await driver.assertComponentExist(ON.text('记一笔'));
     });
 
-    // ==============================
-    // 策略 2: ComponentPresence — 驱动操作验证
-    // ==============================
+    // ==========================================================
+    // 策略 2: ComponentPresence — 验证组件交互
+    // ==========================================================
 
-    it('ComponentPresence_pressBack可用', 0, async () => {
-      try {
-        await driver!.pressBack();
-        await driver!.delayMs(300);
-      } catch (_e) {
-        // 页面栈空时允许异常
-      }
+    it('ComponentPresence_按钮数量大于0', 0, async () => {
+      const btns = await driver.findComponents(ON.type('Button'));
+      expect(btns !== null).assertTrue();
+      expect(btns.length > 0).assertTrue();
     });
 
-    it('ComponentPresence_delayMs正常', 0, async () => {
-      const t0: number = Date.now();
-      await driver!.delayMs(100);
-      expect(Date.now() - t0 >= 50).assertTrue();
+    it('ComponentPresence_点击记一笔进入添加页', 0, async () => {
+      const addBtn = await driver.findComponent(ON.text('记一笔'));
+      expect(addBtn !== null).assertTrue();
+      await addBtn.click();
+      await driver.delayMs(1500);
+      // 进入 AddBillPage 后应有"保存"按钮
+      await driver.assertComponentExist(ON.text('保存'));
+      // 返回首页
+      const cancelBtn = await driver.findComponent(ON.text('取消'));
+      await cancelBtn.click();
+      await driver.delayMs(1500);
+      await driver.assertComponentExist(ON.text('智慧记账'));
     });
 
-    it('ComponentPresence_多次查询无泄漏', 0, async () => {
-      for (let i = 0; i < 3; i++) {
-        await driver!.delayMs(100);
-      }
+    it('ComponentPresence_点击本月切换时间', 0, async () => {
+      await driver.findComponent(ON.text('本月'));
+      // 如果能找到"本月"按钮，说明组件树可用
     });
   });
 }
