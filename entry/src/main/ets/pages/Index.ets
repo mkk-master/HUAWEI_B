@@ -120,7 +120,7 @@ struct Index {
             List() {
               ForEach(this.viewModel.bills, (bill: BillModel) => {
                 ListItem() {
-                  this.buildBillItemWithoutClick(bill)
+                  this.buildBillItem(bill)
                 }
                 .swipeAction({
                   end: this.buildSwipeActions(bill)
