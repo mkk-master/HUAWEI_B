@@ -9,13 +9,21 @@ interface PieDataItem {
 }
 
 /**
+
  * Canvas 饼图组件
  * 使用 XComponent + Drawing API 实现
  */
 @Component
 export struct PieChart {
-  // 外部传入的饼图数据
-  @Prop data: Array<PieDataItem>;
+  // 外部传入的饼图数据（变化时需重绘 Canvas；onReady 仅首次触发）
+  @Prop @Watch('onDataChange') data: Array<PieDataItem> = [];
+  private canvasReady: boolean = false;
+
+  private onDataChange(): void {
+    if (this.canvasReady) {
+      this.drawPieChart();
+    }
+  }
   // Canvas 绘图上下文配置
   private settings: RenderingContextSettings = new RenderingContextSettings(true);
   private context: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings);
@@ -32,6 +40,7 @@ export struct PieChart {
         .width(this.canvasWidth)
         .height(this.canvasHeight)
         .onReady(() => {
+          this.canvasReady = true;
           this.drawPieChart(); // Canvas就绪后绘制饼图
         })
 
@@ -82,6 +91,7 @@ export struct PieChart {
     .width('100%')
     .alignItems(HorizontalAlign.Center)
     .padding({ top: 16, bottom: 16 })
+
   }
 
   // 饼图绘制核心方法（整合并修正位置）
@@ -156,5 +166,7 @@ export struct PieChart {
     ctx.arc(centerX, centerY, radius * 0.55, 0, 2 * Math.PI);
     ctx.fillStyle = '#FFFFFF';
     ctx.fill();
+
   }
 }
+

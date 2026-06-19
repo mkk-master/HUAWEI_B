@@ -4,7 +4,7 @@
  */
 export class CloudAiConfig {
   /** 阿里云 DashScope API Key，形如 sk-xxx */
-  static apiKey: string = '';
+  static apiKey: string = 'sk-c32c4224bd084aa0baa79a0083200fcd';
   static readonly COMPAT_BASE_URL: string = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
   static readonly CHAT_MODEL: string = 'qwen3.6-plus';
 }
