@@ -44,12 +44,12 @@ export class BudgetModel {
  * 分类颜色映射（用于饼图）
  */
 export const CategoryColors: Record<string, string> = {
-  '饮食': '#FF6B6B',
-  '交通': '#4ECDC4',
-  '购物': '#45B7D1',
-  '娱乐': '#96CEB4',
-  '居住': '#FFEAA7',
-  '医疗': '#DDA0DD',
-  '教育': '#98D8C8',
-  '其他': '#F7DC6F'
+  '饮食': '#d36e5f',
+  '交通': '#7842d7',
+  '购物': '#3567ca',
+  '娱乐': '#f9bf41',
+  '居住': '#e07e0d',
+  '医疗': '#e7639a',
+  '教育': '#69bb9c',
+  '其他': '#b0a758'
 };
