@@ -2,7 +2,6 @@
   "module": {
     "name": "entry_test",
     "type": "feature",
-    "srcEntry": "./ets/testrunner/OpenHarmonyTestRunner.ts",
     "deviceTypes": [
       "phone",
       "tablet"
